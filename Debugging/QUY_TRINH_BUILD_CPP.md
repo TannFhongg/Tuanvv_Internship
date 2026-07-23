@@ -204,3 +204,78 @@ g++ main.o math.o -o calculator.exe
 ```
 
 Mỗi file `.cpp` là một translation unit riêng. Header được đưa vào translation unit thông qua `#include`; thông thường header không được compile độc lập.
+
+## 1.3. Debugging
+
+### Quy trình debug chuẩn
+
+1. **Tạo bản tái hiện lỗi nhỏ nhất** (*minimal reproducible example*): loại bỏ những phần không liên quan nhưng vẫn giữ được lỗi.
+2. **Build bản debug:**
+   - GCC/Clang: dùng `-g -O0`.
+   - MSVC: dùng `/Zi /Od`.
+3. **Đọc kỹ thông báo lỗi** và đặt breakpoint gần nơi dữ liệu bắt đầu sai, không chỉ đặt tại dòng chương trình crash.
+4. **Kiểm tra trạng thái chương trình:** call stack, biến cục bộ, trạng thái object, ownership và lifetime.
+5. **Sửa nguyên nhân gốc**, thêm regression test để lỗi không xuất hiện trở lại.
+6. **Kiểm tra lại:** build với warning ở mức cao và chạy sanitizer nếu môi trường hỗ trợ.
+
+Build debug với GCC:
+
+```powershell
+g++ -std=c++20 -g -O0 -Wall -Wextra -Wpedantic main.cpp math.cpp -o app.exe
+```
+
+Trong đó:
+
+- `-g`: thêm thông tin symbol và source line để debugger sử dụng.
+- `-O0`: tắt tối ưu hóa, giúp thứ tự thực thi và giá trị biến dễ theo dõi hơn.
+- Các cờ `-Wall -Wextra -Wpedantic`: bật những cảnh báo hữu ích ngay từ lúc compile.
+
+Build debug với MSVC:
+
+```powershell
+cl /std:c++20 /Zi /Od /EHsc main.cpp math.cpp /Fe:app.exe
+```
+
+### Các lệnh GDB cần thành thạo
+
+```gdb
+gdb ./app.exe       # Mở chương trình bằng debugger
+break main          # Đặt breakpoint tại hàm main
+run                 # Chạy chương trình
+next                # Chạy dòng hiện tại, không đi vào trong hàm được gọi
+step                # Chạy dòng hiện tại và đi vào trong hàm được gọi
+continue            # Chạy đến breakpoint hoặc sự kiện dừng tiếp theo
+print variable      # Xem giá trị của biến hoặc expression
+backtrace           # Hiển thị call stack
+frame 1             # Chuyển sang stack frame số 1
+info locals         # Hiển thị các biến local của frame hiện tại
+watch variable      # Dừng khi giá trị của biến thay đổi
+quit                # Thoát GDB
+```
+
+Ví dụ một phiên debug ngắn:
+
+```gdb
+gdb ./app.exe
+break main
+run
+next
+print result
+backtrace
+continue
+quit
+```
+
+### Khi đặt breakpoint
+
+Nếu chương trình crash tại dòng sử dụng con trỏ, nguyên nhân có thể đã xảy ra trước đó, chẳng hạn object bị giải phóng quá sớm hoặc con trỏ bị ghi đè. Vì vậy cần lần ngược call stack và đặt breakpoint tại nơi dữ liệu được tạo, thay đổi hoặc chuyển quyền sở hữu.
+
+Sau khi sửa lỗi, nên chạy lại với sanitizer nếu dùng GCC hoặc Clang:
+
+```powershell
+g++ -std=c++20 -g -O1 -Wall -Wextra -fsanitize=address,undefined main.cpp math.cpp -o app.exe
+.\app.exe
+```
+
+- AddressSanitizer giúp phát hiện truy cập bộ nhớ không hợp lệ, use-after-free và buffer overflow.
+- UndefinedBehaviorSanitizer giúp phát hiện nhiều dạng undefined behavior trong lúc chạy.
