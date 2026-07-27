@@ -419,3 +419,10 @@ Trong môi trường lập trình nhúng thời gian thực (RTOS / Automotive),
 | Ngữ cảnh áp dụng | Phù hợp với Critical Section lâu hoặc có I/O. | Chỉ phù hợp với Critical Section cực ngắn, không có I/O. |
 | Fairness | Thường có cơ chế xếp hàng, giảm Starvation. | Không đảm bảo công bằng, dễ gây Starvation. |
 | Priority Inversion | Hệ điều hành có thể hỗ trợ Priority Inheritance. | Có thể rất nghiêm trọng nếu luồng ưu tiên cao spin trong khi luồng ưu tiên thấp giữ khóa. |
+
+
+## Khi nào dùng các memory order sau này?
+seq_cst: lựa chọn mặc định khi đang học hoặc khi hiệu năng chưa là vấn đề.
+release khi công bố dữ liệu/trạng thái cho luồng khác.
+acquire khi nhận dữ liệu/trạng thái đã được công bố đó.
+relaxed khi chỉ cần nguyên tử cho chính biến đó, không dùng nó để công bố/bảo vệ dữ liệu khác — ví dụ metric, request counter, thống kê.
