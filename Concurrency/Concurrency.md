@@ -29,6 +29,20 @@ Hai khái niệm này hay bị nhầm lẫn là một, nhưng bản chất chún
 | **Happens-Before** | Mutex và atomic tạo quan hệ thứ tự bộ nhớ: ghi trước `unlock()` có thể được quan sát sau `lock()` tương ứng; acquire/release tạo quan hệ tương tự khi dùng đúng cách. | Đồng bộ hóa không chỉ là “chặn luồng”, mà còn đảm bảo khả kiến của dữ liệu. |
 | **`volatile`** | Báo cho compiler rằng giá trị có thể thay đổi từ bên ngoài chương trình, thường gặp khi truy cập thanh ghi MMIO trong embedded. | Không ngăn Data Race và không tạo Happens-Before; không dùng `volatile` để đồng bộ luồng C++. |
 
+
+Khi nói thao tác A happens-before B, C++ đảm bảo 2 điều kiện tuyệt đối:
+
+**Visibility (Tính hiển thị)**: Mọi thay đổi bộ nhớ do A thực hiện (ghi biến, cấp phát, update cache) chắc chắn sẽ được nhìn thấy bởi B.
+Ordering (Thứ tự thực thi): Trình biên dịch và CPU không được phép tái sắp xếp (reorder) lệnh B chạy ngược lên trước lệnh A.
+
+**Quy tắc 2: Synchronizes-With (Đồng bộ hóa giữa các Thread)**
+Đây là cầu nối bắt chéo giữa 2 thread khác nhau. Các cơ chế đồng bộ trong C++ tạo ra quan hệ này:
+
+**1/ Mutex**: Lệnh mtx.unlock() của Thread A synchronizes-with lệnh mtx.lock() thành công tiếp theo của Thread B.
+
+**2/Thread Lifecycle:** Lệnh tạo thread std::thread th(func) synchronizes-with lệnh đầu tiên bên trong hàm func. Toàn bộ nội dung của func synchronizes-with lệnh th.join() quay về thread chính.
+
+**3/ Atomic Acquire/Release**: Một thao tác Ghi Atomic với memory_order_release synchronizes-with thao tác Đọc Atomic với memory_order_acquire trên cùng một biến đó. 
 ## 4.1. `std::thread` — Quản lý luồng & thực thi song song
 
 Khi một đối tượng `std::thread` được khởi tạo với một hàm, luồng mới sẽ chạy ngay lập tức. Trước khi đối tượng thread bị tiêu hủy (chạy hết scope), bạn bắt buộc phải gọi `join()` hoặc `detach()`. Nếu quên, chương trình sẽ gọi `std::terminate()` gây crash lập tức.
@@ -38,6 +52,8 @@ Khi một đối tượng `std::thread` được khởi tạo với một hàm, 
 | **`join()`** | Luồng gọi bị block đến khi luồng con hoàn thành. | Mặc định nên dùng; giúp bảo đảm lifetime của dữ liệu mà luồng con dùng. |
 | **`detach()`** | Tách luồng con chạy độc lập. | Rất hạn chế. Nếu luồng con giữ tham chiếu/pointer đến dữ liệu cục bộ đã hết lifetime, nó có thể truy cập dangling reference. |
 
+
+Bộ lập lịch của hệ điều hành quyết định thread nào được chạy trên logical CPU nào. Khi số thread sẵn sàng lớn hơn số logical CPU, scheduler cho các thread chạy xen kẽ bằng time slicing. Mỗi lần chuyển từ thread này sang thread khác, hệ điều hành thực hiện context switch bằng cách lưu context của thread cũ và khôi phục context của thread mới.
 ### Bài tập 4.1: Tính tổng mảng song song (Parallel Array Sum)
 
 Đoạn code dưới đây chia một vector kích thước lớn thành K đoạn bằng nhau và giao cho K luồng xử lý song song, sau đó so sánh hiệu năng với bản tuần tự:
@@ -104,7 +120,7 @@ int main() {
 
 ## 4.2. `std::mutex` và Lock RAII — Bảo vệ dữ liệu
 
-`std::mutex` (Mutual Exclusion) bảo vệ Critical Section bằng cách chỉ cho phép 1 luồng được giữ khóa tại một thời điểm.
+`std::mutex` (Mutual Exclusion) bảo vệ Critical Section(**Đoạn mã có nhiều luồng truy cập cùng một tài nguyên chia sẻ, trong đó có ít nhất một thao tác ghi.**) bằng cách chỉ cho phép 1 luồng được giữ khóa tại một thời điểm.
 
 **Quy tắc quan trọng:** Tránh gọi `lock()` và `unlock()` thủ công. Nếu code giữa hai lệnh này ném exception hoặc `return` sớm, `unlock()` có thể không được gọi và gây deadlock. Hãy dùng wrapper RAII:
 
@@ -403,10 +419,3 @@ Trong môi trường lập trình nhúng thời gian thực (RTOS / Automotive),
 | Ngữ cảnh áp dụng | Phù hợp với Critical Section lâu hoặc có I/O. | Chỉ phù hợp với Critical Section cực ngắn, không có I/O. |
 | Fairness | Thường có cơ chế xếp hàng, giảm Starvation. | Không đảm bảo công bằng, dễ gây Starvation. |
 | Priority Inversion | Hệ điều hành có thể hỗ trợ Priority Inheritance. | Có thể rất nghiêm trọng nếu luồng ưu tiên cao spin trong khi luồng ưu tiên thấp giữ khóa. |
-Bạn có muốn thử thách sâu hơn vào phần kỹ thuật cao nào dưới đây để chuẩn bị cho phỏng vấn Embedded/Automotive không?
-
-- Phân tích chi tiết Memory Ordering (Acquire/Release/Relaxed)
-
-- Cài đặt Lock-free Stack bằng cơ chế CAS (Compare-And-Swap)
-
-- Cách giải quyết Priority Inversion trong RTOS / Automotive
