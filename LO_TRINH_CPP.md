@@ -425,15 +425,15 @@ Cần giải thích được `$@`, `$<`, `$^`, `.PHONY`, target/prerequisite/rec
 
 ## Checklist 
 
-- [ ] Phân biệt được `static_cast`, `dynamic_cast`, `const_cast`, C-style cast và rủi ro của chúng bằng ví dụ chạy được.
-- [ ] Tự cài đặt `UniquePtr`, `SharedPtr`, `WeakPtr` bản tối giản và giải thích phần nào khác `std` implementation.
-- [ ] Giải thích được macro chạy trước compiler thế nào và `inline` không đồng nghĩa với luôn inline code.
-- [ ] Build một chương trình nhiều file qua bốn bước: preprocess → compile → assemble → link.
-- [ ] Phân biệt GCC, Clang, MSVC, MinGW-w64; biết ABI/toolchain compatibility là vấn đề gì.
-- [ ] Dùng GDB breakpoint, step, print, watchpoint, backtrace để tìm một lỗi thực tế.
-- [ ] Viết exception an toàn với RAII và custom exception.
-- [ ] Viết function/class/variadic template, specialization và SFINAE/type traits cơ bản.
-- [ ] Giải thích và chứng minh bằng log/test copy/move/noexcept/structured binding.
-- [ ] Tự viết bài producer–consumer đúng với mutex + condition variable; dùng atomic đúng phạm vi.
+- [x ] Phân biệt được `static_cast`, `dynamic_cast`, `const_cast`, C-style cast và rủi ro của chúng bằng ví dụ chạy được.
+- [x ] Tự cài đặt `UniquePtr`, `SharedPtr`, `WeakPtr` bản tối giản và giải thích phần nào khác `std` implementation.
+- [x ] Giải thích được macro chạy trước compiler thế nào và `inline` không đồng nghĩa với luôn inline code.
+- [x ] Build một chương trình nhiều file qua bốn bước: preprocess → compile → assemble → link.
+- [x ] Phân biệt GCC, Clang, MSVC, MinGW-w64; biết ABI/toolchain compatibility là vấn đề gì.
+- [x ] Dùng GDB breakpoint, step, print, watchpoint, backtrace để tìm một lỗi thực tế.
+- [x ] Viết exception an toàn với RAII và custom exception.
+- [x ] Viết function/class/variadic template, specialization và SFINAE/type traits cơ bản.
+- [ x] Giải thích và chứng minh bằng log/test copy/move/noexcept/structured binding.
+- [x ] Tự viết bài producer–consumer đúng với mutex + condition variable; dùng atomic đúng phạm vi.
 - [ ] Tạo CMake project nhiều target, dùng đúng `PRIVATE`/`PUBLIC`/`INTERFACE`.
 - [ ] Viết Makefile cơ bản, build static library và dynamic library, sau đó link/run được app.
