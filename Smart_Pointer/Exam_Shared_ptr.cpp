@@ -174,7 +174,7 @@ private:
 public:
     WeakPtr() noexcept = default;
 
-    WeakPtr(const SharedPtr<T> share) noexcept : control_(share.control_)
+    WeakPtr(const SharedPtr<T>& share) noexcept : control_(share.control_)
     {
         addWeak();
     }
@@ -218,7 +218,7 @@ public:
     }
     bool expired() const noexcept
     {
-        return control_ == nullptr || control_->shared_count : 0;
+        return control_ == nullptr || control_->shared_count == 0;
     }
 
     std::size_t use_count() const noexcept

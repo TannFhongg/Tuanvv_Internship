@@ -7,37 +7,40 @@ Viết Buffer sở hữu dynamic array, log copy/move/destructor; dùng trong st
 #include <iostream>
 #include <vector>
 
-class Buffer {
+class Buffer
+{
 private:
     std::size_t size_;
-    int* data_;
+    int *data_;
 
 public:
     Buffer(std::size_t size)
         : size_(size),
-          data_(new int[size]) {
+          data_(size_ > 0 ? new int[size]{} : nullptr)
+    {
         std::cout << "Create Buffer with size = "
                   << size_ << '\n';
     }
 
     // Copy constructor: tạo vùng nhớ mới.
-    Buffer(const Buffer& other)
+    Buffer(const Buffer &other)
         : size_(other.size_),
-          data_(new int[other.size_]) {
+          data_(new int[other.size_])
+    {
         std::copy(
             other.data_,
             other.data_ + size_,
-            data_
-        );
+            data_);
 
         std::cout << "Copy Buffer with size = "
                   << size_ << '\n';
     }
 
     // Move constructor: lấy vùng nhớ của object cũ.
-    Buffer(Buffer&& other) noexcept
+    Buffer(Buffer &&other) noexcept
         : size_(other.size_),
-          data_(other.data_) {
+          data_(other.data_)
+    {
         other.size_ = 0;
         other.data_ = nullptr;
 
@@ -45,18 +48,20 @@ public:
                   << size_ << '\n';
     }
 
-    ~Buffer() {
+    ~Buffer()
+    {
         std::cout << "Destroy Buffer size = "
                   << size_ << '\n';
 
         delete[] data_;
     }
 
-    Buffer& operator=(const Buffer&) = delete;
-    Buffer& operator=(Buffer&&) = delete;
+    Buffer &operator=(const Buffer &) = delete;
+    Buffer &operator=(Buffer &&) = delete;
 };
 
-int main() {
+int main()
+{
 
     Buffer first(5);
     Buffer copied = first;
@@ -71,4 +76,4 @@ int main() {
     // Vector hết chỗ nên phải cấp phát lại
     // và move Buffer cũ sang vùng nhớ mới.
     buffers.emplace_back(20);
-} 
+}
