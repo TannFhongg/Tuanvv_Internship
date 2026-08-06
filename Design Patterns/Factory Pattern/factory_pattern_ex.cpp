@@ -57,13 +57,24 @@ public:
     }
 };
 
+void processPay(const PaymentFactory &factory)
+{
+    std::unique_ptr<Payment> pay = factory.creatorPay();
+    pay->pay();
+}
+
 int main()
 {
     std::unique_ptr<PaymentFactory> tienViet = std::make_unique<TienViet>();
     std::unique_ptr<Payment> thanhToanTienMaT = tienViet->creatorPay();
-    thanhToanTienMaT -> pay(); 
+    thanhToanTienMaT->pay();
 
-    std::unique_ptr<PaymentFactory> tienThe = std::make_unique<Momo>(); 
-    std::unique_ptr<Payment> thanhToanTienThe = tienThe -> creatorPay(); 
-    thanhToanTienThe -> pay(); 
+    std::unique_ptr<PaymentFactory> moMo = std::make_unique<Momo>();
+    std::unique_ptr<Payment> thanhToanTienThe = moMo->creatorPay();
+    thanhToanTienThe->pay();
+
+    TienViet vnd;
+    processPay(vnd);
+    Momo credit;
+    processPay(credit);
 }
