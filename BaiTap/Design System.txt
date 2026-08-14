@@ -31,7 +31,13 @@ soure path, des path , quyền thực hiện ( pause, cancel , resume , retry,..
 --Executor (logic algorithm) 
 1. Upload
 MainWindow -> file service -> network client -> request -> task manager .
+Client gửi medata(tên file, folder des lưu, size) -> server return TaskId , state 
+Context:  
+Task id, source path, name file, des path, size expected , time , state) 
 2 download 
+Des path lưu , nếu file đã tồn tại từ chối 
+File service tạo context :
+-Task id , logical path server, des path, path temp ( lưu file tạm), exp size, recv size , state 
 Source path, Des path 
 Logic path
 MainWindow -> file serviece -> network client -> 
@@ -68,3 +74,10 @@ workflow
 ---- TaskExecutor( progress , completed, failed) -> TaskManager 
 
 -TCP - loading (đang tìm hiểu) 
+TCP Connected 
+Connected but not authent -> client send key + device id -> License Manager kiểm tra bind 
+-> if(suscess) lưu lại nếu dứ liệu thay đổi -> Client session chuyển thành Authenticated 
+-> Client mở khóa Main App 
+
+TCP framing ? Loading .. 
+Send / Receive ? Loading ..
