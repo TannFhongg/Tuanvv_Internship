@@ -1,0 +1,38 @@
+-- Functional Requirements 
+
+1 Licnese Managememt 
+Kích hoạt bằng Product Key + Device ID 
+2 License Authentication Protocol 
+Client xác thực với server thông qua TCP 
+3 License Valid 
+Cac chức năng chính sẽ bị khóa nếu license không hợp lệ 
+Rules: 
+Server lưu danh sách Product key 
+Một product key liên kết với 1 device id trong lần liên kết đầu tiên 
+Main App phải xác thực license trước khi start 
+Nếu không hết nối tới License Server thì không dùng được các chức năng của MainA App 
+
+-- File Và Folder Managerment
+
+1 File và folder được lưu trên server 
+2 Client hiển thị file/folder
+3 Tất cả đều dùng chung kho lưu ( all license key) 
+4 Client có thể upload,rename,remove,create,move,delete file/folder 
+5 Server từ chối thao tác tên đích "file/folder đã tồn tại", không ghi đè nó 
+6 Sử dụng cơ chế ngoại lệ cho biết lý do thao tác thất bại nếu có 
+
+-- Search 
+1 Tìm kiếm theo tên file hoặc folder 
+2 Chỉ tìm kiếm vào trực tiếp folder hiện tại 
+3 Không đệ quy vào folder con 
+4 Không phân biệt chữ hoa thường 
+5 có thể tìm kiếm 1 phần trong tên của file/folder 
+
+--Task Management 
+1 Task moritor 
+người dùng có thể quan sát tiến độ của task,thông tin task, thông tin error nếu fail 
+2 Task manager 
+theo dõi các respon: upload,search,move,delete,backup 
+3 Task info 
+Enum class các trạng thái : pending, running,completed, failed, Canceled 
+

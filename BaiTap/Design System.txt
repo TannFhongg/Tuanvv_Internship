@@ -1,0 +1,70 @@
+-- Quản lí license: 
+1 Trạng thái : disconnect -> connect but authent -> authent
+2 Mỗi phiên TCP cần authent Key + device ID 
+3 Reconnect tạo phiên mới và xác thực lại 
+4 Disconnect key cần authent lại trong phiên tới 
+
+UI: Create / Enable / Disable 
+1 ServerWindow UI -> License Manager -> changed -> logic cập nhật và hiển thị 
+
+-- File Manager và file system 
+1. Nhận path logic /path/file.txt ... 
+2. Chuẩn hóa / , \ 
+3. Clear path "." ".." 
+4 Nối với path physical path : Root 
+5 Kiểm tra đích tới 
+6 Không move vào chính nó hoặc thư mục con 
+
+List folder,create,rename: Request -> Logic + Reuslt -> Session + response 
+Upload,download,search,... : request -> Task manager create -> select task -> task exe -> file manager (logic) 
+
+-- Task 
+1 enum status : waiting, runing, paused , completed, faild, canceld 
+2 record (dữ liêu, trang thái chung) : id task, type (remove,search, delete,...) , piority , progress , error status , 
+soure path, des path , quyền thực hiện ( pause, cancel , resume , retry,..) 
+3 Task manager 
+- Task by id : task id , record task 
+- queue wait : piority , task id
+- status tasl : run / wait
+- Executor -> avtive task selected (queue task)  
+
+--Executor (logic algorithm) 
+1. Upload
+MainWindow -> file service -> network client -> request -> task manager .
+2 download 
+Source path, Des path 
+Logic path
+MainWindow -> file serviece -> network client -> 
+request -> Task manager create -> select task (Piority queue,scheduler) -> task exe -> file manager (step logic) 
+-> Client Session gửi event -> Task service update -> MainWindown UI 
+3 Search 
+4 Move 
+5 Delete 
+6 Backup
+
+-- Scheduler 
+1 tại 1 thời điểm chỉ có 1 task 
+2 queue waiting 
+3 piority / FIFO 
+4 task priority > task running -> Không ngắt task đang exe 
+5 phân quyền : search (H) ,[ Upload , download, move, delete] (M) backup (L) 
+Move và delete phải kiếm trước trước khi cancel tại thời điểm thay đổi cấu trúc và không retry 
+6: Task + phân quyền -> client : canResume , canPause, canCancel, canRetry 
+
+-- Thread 
+Main thread : 
+- Server Window 
+- TCP server 
+- Client Session 
+-Request Dispatcher 
+- Task manager 
+
++++ Signals / Slots 
+Thread worker Qt 
+- Task executor activate 
+
+workflow
+--- Taskmanager(start , pause, resume, cancel) --> Task Executor 
+---- TaskExecutor( progress , completed, failed) -> TaskManager 
+
+-TCP - loading (đang tìm hiểu) 
