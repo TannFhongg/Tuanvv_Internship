@@ -4,10 +4,12 @@ add_library(ProtocolCommon STATIC)
 target_sources(ProtocolCommon
     PRIVATE
         src/protocolcommon.cpp
+        src/protocolcodec.cpp
         include/protocolcommon.h
         include/protocolconstants.h
         include/protocoltypes.h
         include/protocolheader.h
+        include/protocolcodec.h
 )
 
 target_include_directories(ProtocolCommon
