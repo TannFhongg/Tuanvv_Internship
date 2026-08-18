@@ -5,10 +5,11 @@ project(Mini_Cloud
 
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Test)
 
 qt_standard_project_setup()
 
+include(CTest)
 add_subdirectory(ProtocolCommon)
 add_subdirectory(MainApplication)
 add_subdirectory(ServerApplication)
