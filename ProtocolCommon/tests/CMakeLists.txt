@@ -7,6 +7,7 @@ target_link_libraries(ProtocolCommonTests
     Qt6::Test
 )
 
-add_test(NAME Protocol.encode_and_BigEndian
-    COMMAND ProtocolCommonTests encode_and_BigEndian)
-
+add_test(NAME Protocol.encode
+    COMMAND ProtocolCommonTests encode)
+add_test(NAME Protocol.testBigEndian
+    COMMAND ProtocolCommonTests testBigEndian)
