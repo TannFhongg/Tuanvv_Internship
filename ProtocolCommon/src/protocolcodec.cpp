@@ -1,8 +1,27 @@
 #include "protocolcodec.h"
+#include "protocolconstants.h"
+#include "protocoltypes.h"
 #include <QIODevice>
-#include <QIODevice>
+#include <QDataStream>
 namespace MiniCloud::Protocol
 {
+    namespace
+    {
+        bool isValidMessageType(quint16 value)
+        {
+            switch (static_cast<MessageType>(value))
+            {
+            case MessageType::AuthenticateRequest:
+            case MessageType::AuthenticateResponse:
+            case MessageType::ErrorResponse:
+            case MessageType::FileChunk:
+                return true;
+            case MessageType::Invalid:
+            default:
+                return false;
+            }
+        }
+    }
 
     QByteArray serializeHeader(const ProtocolHeader &header)
     {
@@ -11,7 +30,7 @@ namespace MiniCloud::Protocol
         stream.setByteOrder(QDataStream::BigEndian);
         stream.setVersion(QDataStream::Qt_6_0);
 
-        stream << header.magic;
+        stream << header.protocolMagic;
         stream << header.protocolVersion;
         stream << static_cast<quint16>(header.messageType);
         stream << header.payloadLength;
@@ -23,5 +42,74 @@ namespace MiniCloud::Protocol
             return {};
         }
         return data;
+    }
+
+    HeaderDecodeResult deserializeHeader(const QByteArray &data)
+    {
+        if (data.size() < static_cast<qsizetype>(sizeof(quint32)))
+
+        {
+            return {HeaderDecodeStatus::NeedMoreData, ProtocolHeader{}, ErrorCode::None};
+        }
+
+        QDataStream stream(data);
+        stream.setByteOrder(QDataStream::BigEndian);
+        stream.setVersion(QDataStream::Qt_6_0);
+
+        quint32 recvMagic = 0;
+        stream >> recvMagic;
+
+        if (stream.status() != QDataStream::Ok)
+        {
+            return {HeaderDecodeStatus::Failed, ProtocolHeader{}, ErrorCode::InvalidFrame};
+        }
+
+        if (recvMagic != protocolMagic)
+        {
+            return {HeaderDecodeStatus::Failed, ProtocolHeader{}, ErrorCode::InvalidFrame};
+        }
+
+        if (data.size() < static_cast<qsizetype>(protocolWireHeaderSize))
+        {
+            return {HeaderDecodeStatus::NeedMoreData, ProtocolHeader{}, ErrorCode::None};
+        }
+
+    
+        quint16 recvVersion = 0;
+        stream >> recvVersion;
+        quint16 rawMessageType = 0;
+        stream >> rawMessageType;
+        quint32 recvPayloadLength = 0;
+        stream >> recvPayloadLength;
+        RequestId recvRequestId = 0;
+        stream >> recvRequestId;
+        TaskId recvTaskId = 0;
+        stream >> recvTaskId;
+
+        if (stream.status() != QDataStream::Ok)
+        {
+            return {HeaderDecodeStatus::Failed, ProtocolHeader{}, ErrorCode::InvalidFrame};
+        }
+        if (recvVersion != protocolVersion)
+        {
+            return {HeaderDecodeStatus::Failed, ProtocolHeader{}, ErrorCode::UnsupportedProtocolVersion};
+        }
+        if (!isValidMessageType(rawMessageType))
+        {
+            return {HeaderDecodeStatus::Failed, ProtocolHeader{}, ErrorCode::InvalidMessageType};
+        }
+        if (recvPayloadLength > protocolMaxFramePayloadSize)
+        {
+            return {HeaderDecodeStatus::Failed, ProtocolHeader{}, ErrorCode::PayloadTooLarge};
+        }
+        ProtocolHeader header;
+        header.protocolMagic = recvMagic;
+        header.protocolVersion = recvVersion;
+        header.messageType = static_cast<MessageType>(rawMessageType);
+        header.payloadLength = recvPayloadLength;
+        header.requestId = recvRequestId;
+        header.taskId = recvTaskId;
+
+        return {HeaderDecodeStatus::Success, header, ErrorCode::None};
     }
 }

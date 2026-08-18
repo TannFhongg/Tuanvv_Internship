@@ -22,6 +22,10 @@ namespace MiniCloud::Protocol
         InvalidRequest = 1,
         AuthenticationFailed = 2,
         FileNotFound = 3,
-        InternalServerError = 4
+        InternalServerError = 4, 
+        InvalidFrame = 5,
+        UnsupportedProtocolVersion = 6,
+        InvalidMessageType = 7,
+        PayloadTooLarge = 8,
     };
 }
