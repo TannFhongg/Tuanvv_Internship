@@ -25,7 +25,7 @@ namespace MiniCloud::Protocol
             ErrorCode errorCode = ErrorCode::None;
         };
 
-        ProtocolFrame appendData();
+        void appendData(const QByteArray& data);
         FrameParseResult tryTakeFrame();
         void clear();
 

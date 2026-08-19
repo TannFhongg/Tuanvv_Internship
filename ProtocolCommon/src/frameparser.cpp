@@ -3,9 +3,13 @@
 
 namespace MiniCloud::Protocol
 {
-    FrameParser::ProtocolFrame FrameParser::appendData()
-    {
-        return {};
+    void FrameParser::appendData(const QByteArray& data)
+    {   
+        if(data.isEmpty())
+        {
+            return;
+        }
+        receiveBuffer.append(data);
     }
 
     FrameParser::FrameParseResult FrameParser::tryTakeFrame()
