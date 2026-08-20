@@ -23,6 +23,7 @@ namespace MiniCloud::Protocol
 
         if (decodeResult.status == HeaderDecodeStatus::Failed)
         {
+            receiveBuffer.clear();
             return {FrameParseStatus::Failed, {}, decodeResult.errorCode};
         }
 
@@ -47,5 +48,10 @@ namespace MiniCloud::Protocol
     void FrameParser::clear()
     {
         receiveBuffer.clear();
+    }
+
+    qsizetype FrameParser::bufferedSize()
+    {
+        return receiveBuffer.size();
     }
 }
