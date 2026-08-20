@@ -1,12 +1,19 @@
 add_executable(ProtocolCommonTests
     protocolcodectest.cpp
 )
+add_executable(FrameParserTests
+    frameparsertest.cpp
+)
 target_link_libraries(ProtocolCommonTests
     PRIVATE
     ProtocolCommon
     Qt6::Test
 )
-
+target_link_libraries(FrameParserTests
+    PRIVATE
+    ProtocolCommon
+    Qt6::Test
+)
 add_test(NAME Protocol.encode
     COMMAND ProtocolCommonTests encode)
 
@@ -36,3 +43,15 @@ add_test(NAME Protocol.deserialize_payloadTooLarge_returnsError
 
 add_test(NAME Protocol.deserialize_headerWithFollowingPayload_returnsSuccess
     COMMAND ProtocolCommonTests deserialize_headerWithFollowingPayload_returnsSuccess)
+
+add_test(NAME FrameParser.tryTakeFrame_emptyBuffer_returnsNeedMoreData
+    COMMAND FrameParserTests tryTakeFrame_emptyBuffer_returnsNeedMoreData)
+
+add_test(NAME FrameParser.tryTakeFrame_partialHeader_returnsNeedMoreData
+    COMMAND FrameParserTests tryTakeFrame_partialHeader_returnsNeedMoreData)
+
+add_test(NAME FrameParser.tryTakeFrame_partialPayload_returnsNeedMoreData
+    COMMAND FrameParserTests tryTakeFrame_partialPayload_returnsNeedMoreData)
+
+add_test(NAME FrameParser.tryTakeFrame_completeFrame_returnsFrameReady
+    COMMAND FrameParserTests tryTakeFrame_completeFrame_returnsFrameReady)
