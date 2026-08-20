@@ -12,11 +12,28 @@ namespace MiniCloud::Protocol
         NeedMoreData,
         Failed
     };
+
     struct HeaderDecodeResult
     {
         HeaderDecodeStatus status = HeaderDecodeStatus::Failed;
         ProtocolHeader header{};
         ErrorCode errorCode = ErrorCode::None;
     };
+
+    enum class FrameEncodeStatus { 
+        Success,
+        Failed
+    };  
+
+    struct FrameEncodeResult { 
+        FrameEncodeStatus status = FrameEncodeStatus::Failed;
+        QByteArray encodedFrame; 
+        ErrorCode errorCode = ErrorCode::InvalidFrame;
+    }; 
+
+    FrameEncodeResult serializeFrame(MessageType messageType, RequestId requestId, TaskId taskId, const QByteArray &payload);
+                
+
+    
     HeaderDecodeResult deserializeHeader(const QByteArray &data);
 }

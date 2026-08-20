@@ -64,3 +64,31 @@ add_test(NAME FrameParser.tryTakeFrame_twoCompleteFrames_returnsOneAtATime
 
 add_test(NAME FrameParser.tryTakeFrame_completeFrameAndPartialNext_preservesPartialNextFrame
     COMMAND FrameParserTests tryTakeFrame_completeFrameAndPartialNext_preservesPartialNextFrame)
+
+add_test(NAME FrameParser.tryTakeFrame_invalidMagic_returnsFailedAndClearsBuffer
+    COMMAND FrameParserTests tryTakeFrame_invalidMagic_returnsFailedAndClearsBuffer)
+
+add_test(NAME FrameParser.tryTakeFrame_zeroLengthPayload_returnsFrameReady
+    COMMAND FrameParserTests tryTakeFrame_zeroLengthPayload_returnsFrameReady)
+
+add_test(NAME FrameParser.clear_bufferedData_removesAllBytes
+    COMMAND FrameParserTests clear_bufferedData_removesAllBytes)
+
+add_test(NAME Protocol.serializeFrame_validInput_returnsSuccess
+    COMMAND ProtocolCommonTests serializeFrame_validInput_returnsSuccess)
+
+add_test(NAME Protocol.serializeFrame_zeroLengthPayload_returnsSuccess
+    COMMAND ProtocolCommonTests serializeFrame_zeroLengthPayload_returnsSuccess)
+
+add_test(NAME Protocol.serializeFrame_invalidMessageType_returnsFailed
+    COMMAND ProtocolCommonTests serializeFrame_invalidMessageType_returnsFailed)
+
+add_test(NAME Protocol.serializeFrame_unknownMessageType_returnsFailed
+    COMMAND ProtocolCommonTests serializeFrame_unknownMessageType_returnsFailed)
+
+add_test(NAME Protocol.serializeFrame_payloadTooLarge_returnsFailed
+    COMMAND ProtocolCommonTests serializeFrame_payloadTooLarge_returnsFailed)
+
+add_test(NAME Protocol.serializeFrame_maxPayloadSize_returnsSuccess
+    COMMAND ProtocolCommonTests serializeFrame_maxPayloadSize_returnsSuccess)
+

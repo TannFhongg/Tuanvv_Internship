@@ -158,6 +158,92 @@ private slots:
         QCOMPARE(result.header.requestId, static_cast<quint64>(0x0102030405060708));
         QCOMPARE(result.header.taskId, static_cast<quint64>(0));
     }
+
+    void serializeFrame_validInput_returnsSuccess()
+    {
+        MiniCloud::Protocol::MessageType messageType = MiniCloud::Protocol::MessageType::AuthenticateRequest;
+        MiniCloud::Protocol::RequestId requestId = 101;
+        MiniCloud::Protocol::TaskId taskId = 900;
+        QByteArray payload = QByteArray::fromHex("DE 00 AD FF 01");
+
+        MiniCloud::Protocol::FrameEncodeResult result = MiniCloud::Protocol::serializeFrame(messageType, requestId, taskId, payload);
+        QCOMPARE(result.status, MiniCloud::Protocol::FrameEncodeStatus::Success);
+        QCOMPARE(result.errorCode, MiniCloud::Protocol::ErrorCode::None);
+        const qsizetype expectedFrameSize = MiniCloud::Protocol::protocolWireHeaderSize + payload.size();
+        QCOMPARE(result.encodedFrame.size(), expectedFrameSize);
+
+        MiniCloud::Protocol::HeaderDecodeResult headerResult = MiniCloud::Protocol::deserializeHeader(result.encodedFrame);
+        QCOMPARE(headerResult.header.protocolMagic, MiniCloud::Protocol::protocolMagic);
+        QCOMPARE(headerResult.header.protocolVersion, MiniCloud::Protocol::protocolVersion);
+
+        QCOMPARE(headerResult.header.messageType, messageType);
+        QCOMPARE(headerResult.header.payloadLength, static_cast<quint32>(payload.size()));
+        QCOMPARE(headerResult.header.requestId, requestId);
+        QCOMPARE(headerResult.header.taskId, taskId);
+
+        QByteArray extractedPayload = result.encodedFrame.mid(MiniCloud::Protocol::protocolWireHeaderSize);
+        QCOMPARE(extractedPayload, payload);
+        
+    }
+
+    void serializeFrame_zeroLengthPayload_returnsSuccess()
+    {
+        MiniCloud::Protocol::MessageType messageType = MiniCloud::Protocol::MessageType::AuthenticateRequest;
+        MiniCloud::Protocol::RequestId requestId = 101;
+        MiniCloud::Protocol::TaskId taskId = 900;
+        QByteArray payload = QByteArray::fromHex("");
+        MiniCloud::Protocol::FrameEncodeResult result = MiniCloud::Protocol::serializeFrame(messageType, requestId, taskId, payload);
+        QCOMPARE(result.status, MiniCloud::Protocol::FrameEncodeStatus::Success);
+        QCOMPARE(result.errorCode, MiniCloud::Protocol::ErrorCode::None);
+        QCOMPARE(result.encodedFrame.size(), MiniCloud::Protocol::protocolWireHeaderSize);
+
+        MiniCloud::Protocol::HeaderDecodeResult headerResult = MiniCloud::Protocol::deserializeHeader(result.encodedFrame);
+        QCOMPARE(headerResult.header.payloadLength, static_cast<quint32>(payload.size()));
+    }
+
+    void serializeFrame_invalidMessageType_returnsFailed()
+    {
+        MiniCloud::Protocol::MessageType messageType = MiniCloud::Protocol::MessageType::Invalid;
+        MiniCloud::Protocol::RequestId requestId = 101;
+        MiniCloud::Protocol::TaskId taskId = 900;
+        QByteArray payload = QByteArray::fromHex("DE 00 AD FF 01");
+        MiniCloud::Protocol::FrameEncodeResult result = MiniCloud::Protocol::serializeFrame(messageType, requestId, taskId, payload);
+        QCOMPARE(result.status, MiniCloud::Protocol::FrameEncodeStatus::Failed);
+        QCOMPARE(result.errorCode, MiniCloud::Protocol::ErrorCode::InvalidMessageType);
+    }
+
+    void serializeFrame_unknownMessageType_returnsFailed() {
+        
+        MiniCloud::Protocol::MessageType messageType = static_cast<MiniCloud::Protocol::MessageType>(999);
+        MiniCloud::Protocol::RequestId requestId = 101;
+        MiniCloud::Protocol::TaskId taskId = 900;
+        QByteArray payload = QByteArray::fromHex("DE 00 AD FF 01");
+        MiniCloud::Protocol::FrameEncodeResult result = MiniCloud::Protocol::serializeFrame(messageType, requestId, taskId, payload);
+        QCOMPARE(result.status, MiniCloud::Protocol::FrameEncodeStatus::Failed);
+        QCOMPARE(result.errorCode, MiniCloud::Protocol::ErrorCode::InvalidMessageType);
+    }
+
+    void serializeFrame_payloadTooLarge_returnsFailed() {
+        MiniCloud::Protocol::MessageType messageType = MiniCloud::Protocol::MessageType::AuthenticateRequest;
+        MiniCloud::Protocol::RequestId requestId = 101;
+        MiniCloud::Protocol::TaskId taskId = 900;
+        QByteArray payload(MiniCloud::Protocol::protocolMaxFramePayloadSize + 1, 0x00);
+        MiniCloud::Protocol::FrameEncodeResult result = MiniCloud::Protocol::serializeFrame(messageType, requestId, taskId, payload);
+        QCOMPARE(result.status, MiniCloud::Protocol::FrameEncodeStatus::Failed);
+        QCOMPARE(result.errorCode, MiniCloud::Protocol::ErrorCode::PayloadTooLarge);
+        QCOMPARE(result.encodedFrame.size(), static_cast<qsizetype>(0));
+    }
+
+    void serializeFrame_maxPayloadSize_returnsSuccess() {
+        MiniCloud::Protocol::MessageType messageType = MiniCloud::Protocol::MessageType::AuthenticateRequest;
+        MiniCloud::Protocol::RequestId requestId = 101;
+        MiniCloud::Protocol::TaskId taskId = 900;
+        QByteArray payload(MiniCloud::Protocol::protocolMaxFramePayloadSize, 0x00);
+        MiniCloud::Protocol::FrameEncodeResult result = MiniCloud::Protocol::serializeFrame(messageType, requestId, taskId, payload);
+        QCOMPARE(result.status, MiniCloud::Protocol::FrameEncodeStatus::Success);
+        QCOMPARE(result.errorCode, MiniCloud::Protocol::ErrorCode::None);
+        QCOMPARE(result.encodedFrame.size(), static_cast<qsizetype>(MiniCloud::Protocol::protocolWireHeaderSize + payload.size()));
+    }
 };
 
 QTEST_APPLESS_MAIN(ProtocolCodecTest)

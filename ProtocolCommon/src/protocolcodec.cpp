@@ -74,7 +74,6 @@ namespace MiniCloud::Protocol
             return {HeaderDecodeStatus::NeedMoreData, ProtocolHeader{}, ErrorCode::None};
         }
 
-    
         quint16 recvVersion = 0;
         stream >> recvVersion;
         quint16 rawMessageType = 0;
@@ -111,5 +110,36 @@ namespace MiniCloud::Protocol
         header.taskId = recvTaskId;
 
         return {HeaderDecodeStatus::Success, header, ErrorCode::None};
+    }
+
+    FrameEncodeResult serializeFrame(MessageType messageType, RequestId requestId, TaskId taskId, const QByteArray &payload)
+    {
+        MiniCloud::Protocol::MessageType msgType = messageType;
+        if (isValidMessageType(static_cast<quint16>(msgType)) == false)
+        {
+            return {FrameEncodeStatus::Failed, QByteArray(), MiniCloud::Protocol::ErrorCode::InvalidMessageType};
+        }
+
+        if (payload.size() > static_cast<qsizetype>(MiniCloud::Protocol::protocolMaxFramePayloadSize))
+        {
+            return {FrameEncodeStatus::Failed, QByteArray(), MiniCloud::Protocol::ErrorCode::PayloadTooLarge};
+        }
+
+        MiniCloud::Protocol::ProtocolHeader header;
+        header.protocolMagic = MiniCloud::Protocol::protocolMagic;
+        header.protocolVersion = MiniCloud::Protocol::protocolVersion;
+        header.messageType = msgType;
+        header.payloadLength = static_cast<quint32>(payload.size());
+        header.requestId = requestId;
+        header.taskId = taskId;
+
+        QByteArray headerData = MiniCloud::Protocol::serializeHeader(header);
+        if (headerData.isEmpty())
+        {
+            return {FrameEncodeStatus::Failed, QByteArray(), MiniCloud::Protocol::ErrorCode::InvalidFrame};
+        }
+
+        QByteArray frameData = headerData + payload;
+        return {FrameEncodeStatus::Success, frameData, MiniCloud::Protocol::ErrorCode::None};
     }
 }
