@@ -55,3 +55,12 @@ add_test(NAME FrameParser.tryTakeFrame_partialPayload_returnsNeedMoreData
 
 add_test(NAME FrameParser.tryTakeFrame_completeFrame_returnsFrameReady
     COMMAND FrameParserTests tryTakeFrame_completeFrame_returnsFrameReady)
+
+add_test(NAME FrameParser.tryTakeFrame_fragmentedFrame_returnsReadyAfterRemainderAppended
+    COMMAND FrameParserTests tryTakeFrame_fragmentedFrame_returnsReadyAfterRemainderAppended)
+
+add_test(NAME FrameParser.tryTakeFrame_twoCompleteFrames_returnsOneAtATime
+    COMMAND FrameParserTests tryTakeFrame_twoCompleteFrames_returnsOneAtATime)
+
+add_test(NAME FrameParser.tryTakeFrame_completeFrameAndPartialNext_preservesPartialNextFrame
+    COMMAND FrameParserTests tryTakeFrame_completeFrameAndPartialNext_preservesPartialNextFrame)
