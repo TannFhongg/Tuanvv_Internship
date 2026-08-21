@@ -57,28 +57,24 @@ quint16 TcpServer::serverPort() const
 void TcpServer::onNewConnection()
 {
     QTcpSocket *socket = m_server->nextPendingConnection();
-    if (socket == nullptr)
-        return;
 
-    if(m_server -> isListening() && m_activeSession == nullptr)
+    if (!socket)
     {
-        m_activeSession = new ClientSession(socket, this);
-        connect(m_activeSession, &ClientSession::sessionFinished, this, &TcpServer::onSessionFinished);
-        emit clientConnected();
-    }
-    
-    if (m_activeSession == nullptr)
-    {
-        m_activeSession = new ClientSession(socket, this);
-        connect(m_activeSession, &ClientSession::sessionFinished, this, &TcpServer::onSessionFinished);
-        emit clientConnected();
         return;
     }
-    socket->disconnectFromHost();
-    socket->deleteLater();
-    emit clientRejected();
+
+    if(m_activeSession)
+    {
+        socket->disconnectFromHost();
+        socket->deleteLater();
+        emit clientRejected();
+        return;
+    }
+
+    m_activeSession = new ClientSession(socket, this);
+    connect(m_activeSession, &ClientSession::sessionFinished, this, &TcpServer::onSessionFinished);
+    emit clientConnected();
 }
-
 void TcpServer::onSessionFinished(ClientSession *session)
 {
     if (session == nullptr)
