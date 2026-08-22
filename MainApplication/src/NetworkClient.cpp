@@ -1,5 +1,5 @@
 #include <NetworkClient.h>
-
+#include "protocolcodec.h"
 NetworkClient::NetworkClient(QObject *parent)
     : QObject(parent), m_socket(new QTcpSocket(this))
 {
@@ -19,10 +19,7 @@ bool NetworkClient::connectToServer(const QString &hostname, quint16 port)
     {
         return false;
     }
-    if (m_socket->state() == QAbstractSocket::ConnectedState 
-    || m_socket->state() == QAbstractSocket::ConnectingState 
-    || m_socket->state() == QAbstractSocket::HostLookupState 
-    || m_socket->state() == QAbstractSocket::ClosingState)
+    if (m_socket->state() == QAbstractSocket::ConnectedState || m_socket->state() == QAbstractSocket::ConnectingState || m_socket->state() == QAbstractSocket::HostLookupState || m_socket->state() == QAbstractSocket::ClosingState)
     {
         return false;
     }
@@ -81,4 +78,33 @@ void NetworkClient::onErrorOccurred(QAbstractSocket::SocketError socketError)
 void NetworkClient::onStateChanged(QAbstractSocket::SocketState socketState)
 {
     emit stateChanged(socketState);
+}
+
+bool NetworkClient::sendFrame(MiniCloud::Protocol::MessageType messageType,
+                              MiniCloud::Protocol::RequestId requestId,
+                              MiniCloud::Protocol::TaskId taskId,
+                              const QByteArray &payload)
+{
+    if (m_socket->state() != QAbstractSocket::ConnectedState)
+    {
+        return false;
+    }
+
+    const MiniCloud::Protocol::FrameEncodeResult encodeResult = MiniCloud::Protocol::serializeFrame(messageType, requestId, taskId, payload);
+
+    if (encodeResult.status != MiniCloud::Protocol::FrameEncodeStatus::Success)
+    {
+        return false;
+    }
+
+    const qint64 expectedBytes = static_cast<qint64>(encodeResult.encodedFrame.size());
+    const qint64 queuedBytes  = m_socket->write(encodeResult.encodedFrame);
+
+    if(queuedBytes != expectedBytes)
+    {
+        m_socket->abort();
+        return false;
+    }
+    
+    return true;
 }
