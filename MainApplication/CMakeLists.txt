@@ -7,12 +7,12 @@ qt_add_executable(MainApplication
 
 target_include_directories(MainApplication
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 set_target_properties(MainApplication PROPERTIES
     AUTOUIC_SEARCH_PATHS
-        "${CMAKE_CURRENT_SOURCE_DIR}/Forms"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Forms"
 )
 
 add_library(MainCore STATIC
@@ -22,20 +22,21 @@ add_library(MainCore STATIC
 
 target_include_directories(MainCore
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_link_libraries(MainCore
-    PUBLIC 
+    PUBLIC
     Qt6::Network
+    ProtocolCommon
     PRIVATE
     Qt6::Core
-    ProtocolCommon
 )
 target_link_libraries(MainApplication
     PRIVATE
-        Qt6::Widgets
-        MainCore
+    Qt6::Widgets
+    MainCore
 )
+
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
