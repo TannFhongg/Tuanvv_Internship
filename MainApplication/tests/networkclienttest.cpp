@@ -112,7 +112,7 @@ private slots:
         QSignalSpy spyDisconnected(&networkClient, &NetworkClient::disconnected);
         QSignalSpy spyConnectionError(&networkClient, &NetworkClient::connectionError);
         QSignalSpy spystateChanged(&networkClient, &NetworkClient::stateChanged);
-        
+
         QSignalSpy spyClientDisconnected(serverSocket, &QTcpSocket::disconnected);
 
         networkClient.disconnectFromServer();
@@ -122,8 +122,130 @@ private slots:
         QTRY_COMPARE(networkClient.state(), QAbstractSocket::UnconnectedState);
         QVERIFY(networkClient.isConnected() == false);
         QTRY_COMPARE(spyConnectionError.count(), 0);
+    }
 
+    void connectToServer_whenAlreadyConnected_returnsFalse()
+    {
+        QTcpServer server;
+        server.listen(QHostAddress::LocalHost, 0);
+        NetworkClient networkClient;
+        quint16 port = server.serverPort();
+        QString hostname = "127.0.0.1";
+        QVERIFY(networkClient.connectToServer(hostname, port) == true);
 
+        QTRY_COMPARE(networkClient.state(), QAbstractSocket::ConnectedState);
+        QTRY_COMPARE(networkClient.isConnected(), true);
+
+        QTcpSocket *serverSocket = server.nextPendingConnection();
+        QTRY_VERIFY(serverSocket != nullptr);
+        QTRY_COMPARE(serverSocket->state(), QAbstractSocket::ConnectedState);
+
+        QSignalSpy spyConnected(&networkClient, &NetworkClient::connected);
+        QSignalSpy spyDisconnected(&networkClient, &NetworkClient::disconnected);
+        QSignalSpy spyConnectionError(&networkClient, &NetworkClient::connectionError);
+
+        QSignalSpy spynewConnection(&server, &QTcpServer::newConnection);
+
+        QVERIFY(networkClient.connectToServer(hostname, port) == false);
+        QCOMPARE(networkClient.state(), QAbstractSocket::ConnectedState);
+        QVERIFY(networkClient.isConnected() == true);
+        QCOMPARE(spyConnected.count(), 0);
+        QCOMPARE(spyDisconnected.count(), 0);
+        QCOMPARE(spyConnectionError.count(), 0);
+
+        QVERIFY(serverSocket != nullptr);
+        QTRY_COMPARE(serverSocket->state(), QAbstractSocket::ConnectedState);
+
+        networkClient.disconnectFromServer();
+        QTRY_COMPARE(networkClient.state(), QAbstractSocket::UnconnectedState);
+    }
+
+    void connectToServer_closedPort_emitsConnectionError()
+    {
+        QTcpServer server;
+        server.listen(QHostAddress::LocalHost, 0);
+        quint16 closedPort = server.serverPort();
+        server.close();
+
+        NetworkClient networkClient;
+        QSignalSpy spyConnected(&networkClient, &NetworkClient::connected);
+        QSignalSpy spyDisconnected(&networkClient, &NetworkClient::disconnected);
+        QSignalSpy spyConnectionError(&networkClient, &NetworkClient::connectionError);
+        QSignalSpy spystateChanged(&networkClient, &NetworkClient::stateChanged);
+
+        QVERIFY(networkClient.connectToServer("127.0.0.1", closedPort));
+
+        QTRY_VERIFY(spyConnectionError.count() == 1);
+
+        QTRY_COMPARE(networkClient.state(), QAbstractSocket::UnconnectedState);
+        QTRY_COMPARE(networkClient.isConnected(), false);
+
+        QTRY_COMPARE(networkClient.errorString().isEmpty(), false);
+
+        QTRY_VERIFY(spystateChanged.count() > 0);
+    }
+
+    void connectToServer_afterFailure_canConnectSuccessfully()
+    {
+        QTcpServer server;
+        server.listen(QHostAddress::LocalHost, 0);
+        quint16 port = server.serverPort();
+        server.close();
+
+        NetworkClient networkClient;
+        QSignalSpy spyConnected(&networkClient, &NetworkClient::connected);
+        QSignalSpy spyConnectionError(&networkClient, &NetworkClient::connectionError);
+        QSignalSpy spystateChanged(&networkClient, &NetworkClient::stateChanged);
+
+        networkClient.connectToServer("127.0.0.1", port);
+        QTRY_VERIFY(spyConnectionError.count());
+        QTRY_COMPARE(networkClient.state(), QAbstractSocket::UnconnectedState);
+        QTRY_COMPARE(networkClient.isConnected(), false);
+
+        QTcpServer newServer;
+        newServer.listen(QHostAddress::LocalHost, 0);
+
+        spyConnected.clear();
+        spyConnectionError.clear();
+        spystateChanged.clear();
+
+        QSignalSpy spynewConnection(&newServer, &QTcpServer::newConnection);
+
+        networkClient.connectToServer("127.0.0.1", newServer.serverPort());
+
+        QTRY_COMPARE(networkClient.state(), QAbstractSocket::ConnectedState);
+        QVERIFY(networkClient.isConnected() == true);
+
+        QTRY_COMPARE(spyConnected.count(), 1);
+        QTRY_COMPARE(spynewConnection.count(), 1);
+
+        networkClient.disconnectFromServer();
+        QTRY_COMPARE(networkClient.state(), QAbstractSocket::UnconnectedState);
+    }
+
+    void serverDisconnect_connectedClient_emitsDisconnected()
+    {
+        QTcpServer server;
+        server.listen(QHostAddress::LocalHost, 0);
+        NetworkClient networkClient;
+        quint16 port = server.serverPort();
+        QVERIFY(networkClient.connectToServer("127.0.0.1", port));
+        QTRY_VERIFY(server.hasPendingConnections());
+        QTcpSocket *serverSocket = server.nextPendingConnection();
+        QTRY_VERIFY(serverSocket != nullptr);
+        QTRY_COMPARE(serverSocket->state(), QAbstractSocket::ConnectedState);
+
+        QSignalSpy spyDisconnected(&networkClient, &NetworkClient::disconnected);
+        QSignalSpy spyConnectionError(&networkClient, &NetworkClient::connectionError);
+        QSignalSpy spystateChanged(&networkClient, &NetworkClient::stateChanged);
+
+        serverSocket->disconnectFromHost();
+
+        QTRY_COMPARE(spyDisconnected.count(), 1);
+        QTRY_COMPARE(networkClient.state(), QAbstractSocket::UnconnectedState);
+        QTRY_COMPARE(networkClient.isConnected(), false);
+        QTRY_COMPARE(networkClient.errorString().isEmpty(), false);
+        QTRY_COMPARE(spyConnectionError.count(), 1);
     }
 };
 

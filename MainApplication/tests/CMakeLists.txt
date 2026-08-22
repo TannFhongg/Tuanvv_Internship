@@ -27,3 +27,19 @@ add_test(
 add_test(
     NAME ClientNetworkTests.disconnectFromServer_connectedClient_emitsDisconnected
     COMMAND ClientNetworkTests disconnectFromServer_connectedClient_emitsDisconnected)
+
+add_test(
+    NAME ClientNetworkTests.connectToServer_whenAlreadyConnected_returnsFalse
+    COMMAND ClientNetworkTests connectToServer_whenAlreadyConnected_returnsFalse)
+
+add_test(
+    NAME ClientNetworkTests.connectToServer_closedPort_emitsConnectionError
+    COMMAND ClientNetworkTests connectToServer_closedPort_emitsConnectionError)
+
+add_test(
+    NAME ClientNetworkTests.connectToServer_afterFailure_canConnectSuccessfully
+    COMMAND ClientNetworkTests connectToServer_afterFailure_canConnectSuccessfully)
+    
+add_test(
+    NAME ClientNetworkTests.serverDisconnect_connectedClient_emitsDisconnected
+    COMMAND ClientNetworkTests serverDisconnect_connectedClient_emitsDisconnected)
