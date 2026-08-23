@@ -67,3 +67,33 @@ add_test(
 add_test(
     NAME ClientNetworkTests.sendFrame_twoConsecutiveFrames_serverReceivesBothInOrder
     COMMAND ClientNetworkTests sendFrame_twoConsecutiveFrames_serverReceivesBothInOrder)
+
+add_test(
+    NAME ClientNetworkTests.readyRead_completeFrame_emitsFrameReceived
+    COMMAND ClientNetworkTests readyRead_completeFrame_emitsFrameReceived)
+
+add_test(
+    NAME ClientNetworkTests.readyRead_partialHeader_waitsForRemainingBytes
+    COMMAND ClientNetworkTests readyRead_partialHeader_waitsForRemainingBytes)
+
+add_test(
+    NAME ClientNetworkTests.readyRead_partialPayload_waitsForRemainingBytes
+    COMMAND ClientNetworkTests readyRead_partialPayload_waitsForRemainingBytes)
+
+add_test(
+    NAME ClientNetworkTests.readyRead_twoCompleteFrames_emitsBothInOrder
+    COMMAND ClientNetworkTests readyRead_twoCompleteFrames_emitsBothInOrder)
+
+add_test(
+    NAME ClientNetworkTests.readyRead_completeFrameAndPartialNextFrame_preservesRemainder
+    COMMAND ClientNetworkTests readyRead_completeFrameAndPartialNextFrame_preservesRemainder)
+
+add_test(
+    NAME ClientNetworkTests.readyRead_invalidMagic_emitsProtocolErrorAndDisconnects
+    COMMAND ClientNetworkTests readyRead_invalidMagic_emitsProtocolErrorAndDisconnects)
+
+add_test(
+    NAME ClientNetworkTests.disconnectWithPartialFrame_thenReconnect_doesNotReuseOldBuffer
+    COMMAND ClientNetworkTests disconnectWithPartialFrame_thenReconnect_doesNotReuseOldBuffer)
+
+
