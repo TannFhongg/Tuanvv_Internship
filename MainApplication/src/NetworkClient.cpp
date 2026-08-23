@@ -7,6 +7,7 @@ NetworkClient::NetworkClient(QObject *parent)
     connect(m_socket, &QTcpSocket::disconnected, this, &NetworkClient::onDisconnected);
     connect(m_socket, &QTcpSocket::errorOccurred, this, &NetworkClient::onErrorOccurred);
     connect(m_socket, &QTcpSocket::stateChanged, this, &NetworkClient::onStateChanged);
+    connect(m_socket, &QTcpSocket::readyRead, this, &NetworkClient::onReadyRead);
 }
 
 bool NetworkClient::connectToServer(const QString &hostname, quint16 port)
@@ -67,6 +68,7 @@ void NetworkClient::onConnected()
 
 void NetworkClient::onDisconnected()
 {
+    m_frameParser.clear();
     emit disconnected();
 }
 
@@ -98,13 +100,48 @@ bool NetworkClient::sendFrame(MiniCloud::Protocol::MessageType messageType,
     }
 
     const qint64 expectedBytes = static_cast<qint64>(encodeResult.encodedFrame.size());
-    const qint64 queuedBytes  = m_socket->write(encodeResult.encodedFrame);
+    const qint64 queuedBytes = m_socket->write(encodeResult.encodedFrame);
 
-    if(queuedBytes != expectedBytes)
+    if (queuedBytes != expectedBytes)
     {
         m_socket->abort();
         return false;
     }
-    
+
     return true;
 }
+
+void NetworkClient::processBufferedFrames()
+{
+    while (true)
+    {
+        const MiniCloud::Protocol::FrameParser::FrameParseResult result = m_frameParser.tryTakeFrame();
+
+        switch (result.status)
+        {
+        case MiniCloud::Protocol::FrameParser::FrameParseStatus::FrameReady:
+            emit frameReceived(result.frame);
+            break;
+        case MiniCloud::Protocol::FrameParser::FrameParseStatus::NeedMoreData:
+            return;
+        case MiniCloud::Protocol::FrameParser::FrameParseStatus::Failed:
+            emit protocolError(result.errorCode,QStringLiteral("Failed"));
+            m_frameParser.clear();
+            m_socket->abort();
+            return;
+        }
+    }
+}
+
+void NetworkClient::onReadyRead()
+{
+    const QByteArray data = m_socket->readAll();
+    if (data.isEmpty())
+    {
+        return;
+    }
+    m_frameParser.appendData(data);
+
+    processBufferedFrames();
+}
+

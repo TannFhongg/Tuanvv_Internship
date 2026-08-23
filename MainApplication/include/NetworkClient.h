@@ -35,7 +35,6 @@ signals:
     void stateChanged(QAbstractSocket::SocketState socketState);
     
     void frameReceived(const MiniCloud::Protocol::ProtocolFrame& frame); 
-    
     void protocolError(MiniCloud::Protocol::ErrorCode errorCode, const QString& message);     
 
 private slots:
@@ -44,8 +43,11 @@ private slots:
     void onErrorOccurred(QAbstractSocket::SocketError socketError);
     void onStateChanged(QAbstractSocket::SocketState socketState);
 
+    void onReadyRead();
+
 private:
     QTcpSocket *m_socket;
     MiniCloud::Protocol::FrameParser m_frameParser;
+    void processBufferedFrames(); 
 };
  
