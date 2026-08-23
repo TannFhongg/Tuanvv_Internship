@@ -39,7 +39,31 @@ add_test(
 add_test(
     NAME ClientNetworkTests.connectToServer_afterFailure_canConnectSuccessfully
     COMMAND ClientNetworkTests connectToServer_afterFailure_canConnectSuccessfully)
-    
+
 add_test(
     NAME ClientNetworkTests.serverDisconnect_connectedClient_emitsDisconnected
     COMMAND ClientNetworkTests serverDisconnect_connectedClient_emitsDisconnected)
+
+add_test(
+    NAME ClientNetworkTests.sendFrame_whenDisconnected_returnsFalse
+    COMMAND ClientNetworkTests sendFrame_whenDisconnected_returnsFalse)
+
+add_test(
+    NAME ClientNetworkTests.sendFrame_whenConnected_serverReceivesCompleteFrame
+    COMMAND ClientNetworkTests sendFrame_whenConnected_serverReceivesCompleteFrame)
+
+add_test(
+    NAME ClientNetworkTests.sendFrame_invalidMessageType_returnsFalseAndSendsNoBytes
+    COMMAND ClientNetworkTests sendFrame_invalidMessageType_returnsFalseAndSendsNoBytes)
+
+add_test(
+    NAME ClientNetworkTests.sendFrame_payloadTooLarge_returnsFalseAndSendsNoBytes
+    COMMAND ClientNetworkTests sendFrame_payloadTooLarge_returnsFalseAndSendsNoBytes)
+
+add_test(
+    NAME ClientNetworkTests.sendFrame_payloadAtMaximumSize_serverReceivesCompleteFrame
+    COMMAND ClientNetworkTests sendFrame_payloadAtMaximumSize_serverReceivesCompleteFrame)
+
+add_test(
+    NAME ClientNetworkTests.sendFrame_twoConsecutiveFrames_serverReceivesBothInOrder
+    COMMAND ClientNetworkTests sendFrame_twoConsecutiveFrames_serverReceivesBothInOrder)
