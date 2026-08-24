@@ -27,8 +27,11 @@ signals:
 
 private slots:
     void onDisconnected();
- 
+    void onReadyRead();
+
 private:
     QTcpSocket *m_socket = nullptr;
     MiniCloud::Protocol::FrameParser m_frameParser;
+
+    void processBufferedFrames();
 };

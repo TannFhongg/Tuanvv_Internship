@@ -1,5 +1,7 @@
 #include "ClientSession.h"
 #include "protocolcodec.h"
+#include "frameparser.h"
+#include "protocolcodec.h"
 #include <QtGlobal>
 
 ClientSession::ClientSession(QTcpSocket *socket, QObject *parent)
@@ -12,10 +14,15 @@ ClientSession::ClientSession(QTcpSocket *socket, QObject *parent)
             &QTcpSocket::disconnected,
             this,
             &ClientSession::onDisconnected);
+    connect(m_socket,
+            &QTcpSocket::readyRead,
+            this,
+            &ClientSession::onReadyRead);
 }
 
 void ClientSession::onDisconnected()
 {
+    m_frameParser.clear();
     emit sessionFinished(this);
 }
 
@@ -26,7 +33,7 @@ void ClientSession::closeSession()
         m_socket->disconnectFromHost();
     }
 }
- 
+
 bool ClientSession::sendFrame(
     MiniCloud::Protocol::MessageType messageType,
     MiniCloud::Protocol::RequestId requestId,
@@ -50,4 +57,44 @@ bool ClientSession::sendFrame(
         return false;
     }
     return true;
+}
+
+void ClientSession::onReadyRead()
+{
+    const QByteArray data = m_socket->readAll();
+
+    if (data.isEmpty())
+    {
+        return;
+    }
+
+    m_frameParser.appendData(data);
+    processBufferedFrames();
+}
+
+void ClientSession::processBufferedFrames()
+{
+    for (;;)
+    {
+        const MiniCloud::Protocol::FrameParser::FrameParseResult result = m_frameParser.tryTakeFrame();
+
+        if (result.status == MiniCloud::Protocol::FrameParser::FrameParseStatus::Failed)
+        {
+            emit protocolError(this, result.errorCode, QStringLiteral("Failed"));
+            m_frameParser.clear();
+            m_socket->abort();
+            return;
+        }
+
+        if (result.status == MiniCloud::Protocol::FrameParser::FrameParseStatus::NeedMoreData)
+        {
+            return;
+        }
+
+        if (result.status == MiniCloud::Protocol::FrameParser::FrameParseStatus::FrameReady)
+        {
+            emit frameReceived(this, result.frame);
+            break;
+        }
+    }
 }
