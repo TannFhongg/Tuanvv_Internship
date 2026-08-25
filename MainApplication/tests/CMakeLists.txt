@@ -8,6 +8,16 @@ target_link_libraries(ClientNetworkTests
     MainCore
 )
 
+add_executable(RequestDispatcherTests
+    requestdispatchertest.cpp
+)
+
+target_link_libraries(RequestDispatcherTests
+    PRIVATE
+    Qt6::Test
+    MainCore
+)
+
 add_test(
     NAME ClientNetworkTests
     COMMAND ClientNetworkTests)
@@ -96,4 +106,38 @@ add_test(
     NAME ClientNetworkTests.disconnectWithPartialFrame_thenReconnect_doesNotReuseOldBuffer
     COMMAND ClientNetworkTests disconnectWithPartialFrame_thenReconnect_doesNotReuseOldBuffer)
 
+add_test(
+    NAME RequestDispatcherTests
+    COMMAND RequestDispatcherTests)
 
+add_test(
+    NAME RequestDispatcherTests.sendRequest_invalidMessageType_returnsFailedWithoutPending
+    COMMAND RequestDispatcherTests sendRequest_invalidMessageType_returnsFailedWithoutPending)
+
+add_test(
+    NAME RequestDispatcherTests.sendRequest_invalidDestination_returnsFailedWithoutPending
+    COMMAND RequestDispatcherTests sendRequest_invalidDestination_returnsFailedWithoutPending)
+
+add_test(
+    NAME RequestDispatcherTests.sendRequest_whenDisconnected_returnsNotConnectedWithoutPending
+    COMMAND RequestDispatcherTests sendRequest_whenDisconnected_returnsNotConnectedWithoutPending)
+
+add_test(
+    NAME RequestDispatcherTests.sendRequest_whenConnected_returnsAcceptedAndCreatesPending
+    COMMAND RequestDispatcherTests sendRequest_whenConnected_returnsAcceptedAndCreatesPending)
+
+add_test(
+    NAME RequestDispatcherTests.sendRequest_twoRequests_generatesDistinctIdsAndTracksBoth
+    COMMAND RequestDispatcherTests sendRequest_twoRequests_generatesDistinctIdsAndTracksBoth)
+
+add_test(
+    NAME RequestDispatcherTests.response_matchingRequest_removesPendingAndEmitsResponse
+    COMMAND RequestDispatcherTests response_matchingRequest_removesPendingAndEmitsResponse)
+
+add_test(
+    NAME RequestDispatcherTests.response_unknownRequestId_isIgnoredAndKeepsPending
+    COMMAND RequestDispatcherTests response_unknownRequestId_isIgnoredAndKeepsPending)
+
+add_test(
+    NAME RequestDispatcherTests.response_wrongMessageType_removesPendingAndEmitsResponseTypeMismatch
+    COMMAND RequestDispatcherTests response_wrongMessageType_removesPendingAndEmitsResponseTypeMismatch)
