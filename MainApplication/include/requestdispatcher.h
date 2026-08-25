@@ -16,11 +16,15 @@ class RequestDispatcher : public QObject
     Q_OBJECT
 
 public:
-    explicit RequestDispatcher(NetworkClient *networkClient , QObject *parent = nullptr);
+    explicit RequestDispatcher(NetworkClient *networkClient, QObject *parent = nullptr);
 
     MiniCloud::Client::RequestSendResult sendRequest(MiniCloud::Protocol::MessageType requestType, MiniCloud::Protocol::TaskId taskId, const QByteArray &payload, MiniCloud::Client::RequestDestination destination);
 
     qsizetype pendingRequestCount() const;
+
+signals:
+    void responseReceived(MiniCloud::Client::RequestDestination destination, const MiniCloud::Protocol::ProtocolFrame &frame);
+    void requestFailed(MiniCloud::Client::RequestDestination destination, MiniCloud::Protocol::RequestId requestId, MiniCloud::Protocol::TaskId taskId, MiniCloud::Client::RequestDispatchError errorCode);
 
 private slots:
     void onFrameReceived(const MiniCloud::Protocol::ProtocolFrame &frame);
