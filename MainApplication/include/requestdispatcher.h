@@ -7,6 +7,7 @@
 #include <QTimer>
 
 #include "protocolframe.h"
+#include "errorresponse.h"
 #include "requesttypes.h"
 
 class NetworkClient;
@@ -17,6 +18,7 @@ class RequestDispatcher : public QObject
 
 public:
     explicit RequestDispatcher(NetworkClient *networkClient, QObject *parent = nullptr);
+    RequestDispatcher(NetworkClient *networkClient, qint64 requestTimeoutMs = 5000, QObject *parent = nullptr);
 
     MiniCloud::Client::RequestSendResult sendRequest(MiniCloud::Protocol::MessageType requestType, MiniCloud::Protocol::TaskId taskId, const QByteArray &payload, MiniCloud::Client::RequestDestination destination);
 
@@ -25,6 +27,7 @@ public:
 signals:
     void responseReceived(MiniCloud::Client::RequestDestination destination, const MiniCloud::Protocol::ProtocolFrame &frame);
     void requestFailed(MiniCloud::Client::RequestDestination destination, MiniCloud::Protocol::RequestId requestId, MiniCloud::Protocol::TaskId taskId, MiniCloud::Client::RequestDispatchError errorCode);
+    void errorResponseReceived(MiniCloud::Client::RequestDestination destination, MiniCloud::Protocol::RequestId requestId, MiniCloud::Protocol::TaskId taskId, const MiniCloud::Protocol::ErrorResponseData &data);
 
 private slots:
     void onFrameReceived(const MiniCloud::Protocol::ProtocolFrame &frame);
@@ -47,4 +50,5 @@ private:
     QHash<MiniCloud::Protocol::RequestId, PendingRequest> m_pendingRequests;
     MiniCloud::Protocol::RequestId m_nextRequestId = 1;
     QTimer *m_timeoutTimer = nullptr;
+    qint64 m_requestTimeoutMs;
 };

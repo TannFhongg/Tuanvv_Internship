@@ -5,13 +5,19 @@
 namespace
 {
     constexpr int timeoutCheckIntervalMs = 100;
-    constexpr qint64 requestTimeoutMs = 5000;
+    constexpr int defaultRequestTimeoutMs = 5000;
 }
 
-RequestDispatcher::RequestDispatcher(NetworkClient *networkClient, QObject *parent)
-    : QObject(parent), m_networkClient(networkClient), m_timeoutTimer(new QTimer(this))
+RequestDispatcher::RequestDispatcher(
+    NetworkClient *networkClient,
+    QObject *parent)
+    : RequestDispatcher(networkClient, defaultRequestTimeoutMs, parent) {}
+
+RequestDispatcher::RequestDispatcher(NetworkClient *networkClient, qint64 requestTimeoutMs, QObject *parent)
+    : QObject(parent), m_networkClient(networkClient), m_timeoutTimer(new QTimer(this)), m_requestTimeoutMs(requestTimeoutMs)
 {
     Q_ASSERT(m_networkClient);
+    Q_ASSERT(m_requestTimeoutMs > 0);
 
     m_timeoutTimer->setInterval(timeoutCheckIntervalMs);
 
@@ -70,7 +76,7 @@ MiniCloud::Client::RequestSendResult RequestDispatcher::sendRequest(MiniCloud::P
     pendingRequest.expectedResponseType = expectedResponseType;
     pendingRequest.destination = destination;
     pendingRequest.taskId = taskId;
-    pendingRequest.deadline = QDeadlineTimer(requestTimeoutMs);
+    pendingRequest.deadline = QDeadlineTimer(m_requestTimeoutMs);
 
     m_pendingRequests.insert(requestId, pendingRequest);
 
@@ -120,6 +126,33 @@ void RequestDispatcher::onFrameReceived(const MiniCloud::Protocol::ProtocolFrame
 
     if (frame.header.messageType == MiniCloud::Protocol::MessageType::ErrorResponse)
     {
+        const MiniCloud::Protocol::ErrorResponseDecodeResult decodeResult = MiniCloud::Protocol::deserializeErrorResponse(frame.payload);
+
+        if (decodeResult.status != MiniCloud::Protocol::ErrorResponseDecodeResult::Status::Success)
+        {
+            const MiniCloud::Client::RequestDestination destination = pendingRequestIt->destination;
+            const MiniCloud::Protocol::TaskId taskId = pendingRequestIt->taskId;
+            m_pendingRequests.erase(pendingRequestIt);
+
+            if (m_pendingRequests.isEmpty())
+            {
+                m_timeoutTimer->stop();
+            }
+
+            emit requestFailed(destination, frame.header.requestId, taskId, MiniCloud::Client::RequestDispatchError::InvalidResponsePayload);
+            return;
+        }
+
+        const MiniCloud::Client::RequestDestination destination = pendingRequestIt->destination;
+        const MiniCloud::Protocol::TaskId taskId = pendingRequestIt->taskId;
+        m_pendingRequests.erase(pendingRequestIt);
+
+        if (m_pendingRequests.isEmpty())
+        {
+            m_timeoutTimer->stop();
+        }
+
+        emit errorResponseReceived(destination, frame.header.requestId, taskId, decodeResult.data);
         return;
     }
 
@@ -137,8 +170,54 @@ void RequestDispatcher::onFrameReceived(const MiniCloud::Protocol::ProtocolFrame
 
 void RequestDispatcher::onDisconnected()
 {
+    m_timeoutTimer->stop();
+
+    QList<QPair<MiniCloud::Protocol::RequestId, PendingRequest>> pendingRequests;
+    pendingRequests.reserve(m_pendingRequests.size());
+
+    for (auto it = m_pendingRequests.cbegin(); it != m_pendingRequests.cend(); ++it)
+    {
+        pendingRequests.append(qMakePair(it.key(), it.value()));
+    }
+    m_pendingRequests.clear();
+
+    for (const auto &[requestId, pendingRequest] : pendingRequests)
+    {
+        emit requestFailed(pendingRequest.destination, requestId, pendingRequest.taskId, MiniCloud::Client::RequestDispatchError::ConnectionLost);
+    }
 }
 
 void RequestDispatcher::onTimeoutTick()
 {
+    QList<QPair<MiniCloud::Protocol::RequestId, PendingRequest>> expiredRequests;
+
+    for (auto it = m_pendingRequests.cbegin(); it != m_pendingRequests.cend(); ++it)
+    {
+        if (it->deadline.hasExpired())
+        {
+            expiredRequests.append(qMakePair(it.key(), it.value()));
+        }
+    }
+
+    for (const auto &expiredRequest : expiredRequests)
+    {
+        m_pendingRequests.remove(expiredRequest.first);
+    }
+
+    if (m_pendingRequests.isEmpty())
+    {
+        m_timeoutTimer->stop();
+    }
+
+    for (const auto &expiredRequest : expiredRequests)
+    {
+        const MiniCloud::Protocol::RequestId requestId = expiredRequest.first;
+        const PendingRequest &pendingRequest = expiredRequest.second;
+
+        emit requestFailed(
+            pendingRequest.destination,
+            requestId,
+            pendingRequest.taskId,
+            MiniCloud::Client::RequestDispatchError::RequestTimeout);
+    }
 }
