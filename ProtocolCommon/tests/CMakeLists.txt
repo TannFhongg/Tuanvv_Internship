@@ -4,6 +4,10 @@ add_executable(ProtocolCommonTests
 add_executable(FrameParserTests
     frameparsertest.cpp
 )
+add_executable(ErrorResponseCodecTests
+    errorresponsetest.cpp
+)
+
 target_link_libraries(ProtocolCommonTests
     PRIVATE
     ProtocolCommon
@@ -14,6 +18,13 @@ target_link_libraries(FrameParserTests
     ProtocolCommon
     Qt6::Test
 )
+
+target_link_libraries(ErrorResponseCodecTests
+    PRIVATE
+    ProtocolCommon
+    Qt6::Test
+)
+
 add_test(NAME Protocol.encode
     COMMAND ProtocolCommonTests encode)
 
@@ -92,3 +103,53 @@ add_test(NAME Protocol.serializeFrame_payloadTooLarge_returnsFailed
 add_test(NAME Protocol.serializeFrame_maxPayloadSize_returnsSuccess
     COMMAND ProtocolCommonTests serializeFrame_maxPayloadSize_returnsSuccess)
 
+add_test(NAME ErrorResponseCodecTests.errorResponse_validData_roundTripsSuccessfully
+    COMMAND ErrorResponseCodecTests errorResponse_validData_roundTripsSuccessfully)
+
+add_test(
+    NAME ErrorResponseCodecTests.serializeErrorResponse_noneErrorCode_returnsFailed
+    COMMAND ErrorResponseCodecTests serializeErrorResponse_noneErrorCode_returnsFailed)
+
+add_test(
+    NAME ErrorResponseCodecTests.deserializeErrorResponse_malformedJson_returnsFailed
+    COMMAND ErrorResponseCodecTests deserializeErrorResponse_malformedJson_returnsFailed)
+
+add_test(
+    NAME ErrorResponseCodecTests.deserializeErrorResponse_jsonArray_returnsFailed
+    COMMAND ErrorResponseCodecTests deserializeErrorResponse_jsonArray_returnsFailed)
+
+add_test(
+    NAME ErrorResponseCodecTests.deserializeErrorResponse_missingErrorCode_returnsFailed
+    COMMAND ErrorResponseCodecTests deserializeErrorResponse_missingErrorCode_returnsFailed)
+
+add_test(
+    NAME ErrorResponseCodecTests.deserializeErrorResponse_errorCodeWrongType_returnsFailed
+    COMMAND ErrorResponseCodecTests deserializeErrorResponse_errorCodeWrongType_returnsFailed)
+
+add_test(
+    NAME ErrorResponseCodecTests.deserializeErrorResponse_unknownErrorCode_returnsFailed
+    COMMAND ErrorResponseCodecTests deserializeErrorResponse_unknownErrorCode_returnsFailed)
+
+add_test(
+    NAME ErrorResponseCodecTests.deserializeErrorResponse_noneErrorCode_returnsFailed
+    COMMAND ErrorResponseCodecTests deserializeErrorResponse_noneErrorCode_returnsFailed)
+
+add_test(
+    NAME ErrorResponseCodecTests.deserializeErrorResponse_missingMessage_returnsFailed
+    COMMAND ErrorResponseCodecTests deserializeErrorResponse_missingMessage_returnsFailed)
+
+add_test(
+    NAME ErrorResponseCodecTests.deserializeErrorResponse_messageWrongType_returnsFailed
+    COMMAND ErrorResponseCodecTests deserializeErrorResponse_messageWrongType_returnsFailed)
+
+add_test(
+    NAME ErrorResponseCodecTests.deserializeErrorResponse_missingDetails_returnsFailed
+    COMMAND ErrorResponseCodecTests deserializeErrorResponse_missingDetails_returnsFailed)
+
+add_test(
+    NAME ErrorResponseCodecTests.deserializeErrorResponse_detailsWrongType_returnsFailed
+    COMMAND ErrorResponseCodecTests deserializeErrorResponse_detailsWrongType_returnsFailed)
+
+add_test(
+    NAME ErrorResponseCodecTests.deserializeErrorResponse_fractionalErrorCode_returnsFailed
+    COMMAND ErrorResponseCodecTests deserializeErrorResponse_fractionalErrorCode_returnsFailed)
