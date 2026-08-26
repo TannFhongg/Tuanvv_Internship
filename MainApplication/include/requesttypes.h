@@ -32,6 +32,7 @@ namespace MiniCloud::Client
         ConnectionLost,
         RequestTimeout,
         ResponseTypeMismatch,
+        InvalidResponsePayload,
         UnexpectedResponse
     };
 
