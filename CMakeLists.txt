@@ -13,3 +13,7 @@ include(CTest)
 add_subdirectory(ProtocolCommon)
 add_subdirectory(MainApplication)
 add_subdirectory(ServerApplication)
+
+if(BUILD_TESTING)
+    add_subdirectory(IntegrationTests)
+endif()
