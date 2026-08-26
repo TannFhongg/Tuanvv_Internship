@@ -1,19 +1,30 @@
 #include "requestdispatcher.h"
-
 #include "NetworkClient.h"
-
+#include "protocolconstants.h"
 namespace
 {
     constexpr int timeoutCheckIntervalMs = 100;
     constexpr int defaultRequestTimeoutMs = 5000;
+
+    bool isValidDestination(MiniCloud::Client::RequestDestination destination)
+    {
+        switch (destination)
+        {
+        case MiniCloud::Client::RequestDestination::License:
+        case MiniCloud::Client::RequestDestination::File:
+        case MiniCloud::Client::RequestDestination::Task:
+            return true;
+        case MiniCloud::Client::RequestDestination::Invalid:
+        default:
+            return false;
+        }
+    }
 }
 
-RequestDispatcher::RequestDispatcher(
-    NetworkClient *networkClient,
-    QObject *parent)
+RequestDispatcher::RequestDispatcher(NetworkClient *networkClient, QObject *parent)
     : RequestDispatcher(networkClient, defaultRequestTimeoutMs, parent) {}
 
-RequestDispatcher::RequestDispatcher(NetworkClient *networkClient, qint64 requestTimeoutMs, QObject *parent)
+RequestDispatcher::RequestDispatcher(NetworkClient *networkClient, int requestTimeoutMs, QObject *parent)
     : QObject(parent), m_networkClient(networkClient), m_timeoutTimer(new QTimer(this)), m_requestTimeoutMs(requestTimeoutMs)
 {
     Q_ASSERT(m_networkClient);
@@ -54,11 +65,19 @@ MiniCloud::Client::RequestSendResult RequestDispatcher::sendRequest(MiniCloud::P
         return result;
     }
 
-    if (destination == MiniCloud::Client::RequestDestination::Invalid)
+    if (!isValidDestination(destination))
     {
         result.status = MiniCloud::Client::RequestSendStatus::Failed;
         result.requestId = 0;
         result.errorCode = MiniCloud::Client::RequestDispatchError::InvalidDestination;
+        return result;
+    }
+
+    if (payload.size() > MiniCloud::Protocol::protocolMaxFramePayloadSize)
+    {
+        result.status = MiniCloud::Client::RequestSendStatus::Failed;
+        result.requestId = 0;
+        result.errorCode = MiniCloud::Client::RequestDispatchError::PayloadTooLarge;
         return result;
     }
 
@@ -70,7 +89,7 @@ MiniCloud::Client::RequestSendResult RequestDispatcher::sendRequest(MiniCloud::P
         return result;
     }
 
-    const MiniCloud::Protocol::RequestId requestId = m_nextRequestId++;
+    const MiniCloud::Protocol::RequestId requestId = generateRequestId();
     PendingRequest pendingRequest;
     pendingRequest.requestType = requestType;
     pendingRequest.expectedResponseType = expectedResponseType;
@@ -84,8 +103,9 @@ MiniCloud::Client::RequestSendResult RequestDispatcher::sendRequest(MiniCloud::P
     {
         m_pendingRequests.remove(requestId);
         result.status = MiniCloud::Client::RequestSendStatus::Failed;
-        result.requestId = 0;
-        result.errorCode = MiniCloud::Client::RequestDispatchError::SocketWriteFailed;
+        result.requestId = requestId;
+
+        result.errorCode = m_networkClient->isConnected() ? MiniCloud::Client::RequestDispatchError::SocketWriteFailed : MiniCloud::Client::RequestDispatchError::ConnectionLost;
         return result;
     }
 
@@ -219,5 +239,21 @@ void RequestDispatcher::onTimeoutTick()
             requestId,
             pendingRequest.taskId,
             MiniCloud::Client::RequestDispatchError::RequestTimeout);
+    }
+}
+MiniCloud::Protocol::RequestId RequestDispatcher::generateRequestId()
+{
+    while (true)
+    {
+        const MiniCloud::Protocol::RequestId requestId = m_nextRequestId++;
+
+        if (requestId == 0)
+            continue;
+
+        if (m_pendingRequests.contains(requestId))
+        {
+            continue;
+        }
+        return requestId;
     }
 }

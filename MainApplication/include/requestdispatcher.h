@@ -18,7 +18,7 @@ class RequestDispatcher : public QObject
 
 public:
     explicit RequestDispatcher(NetworkClient *networkClient, QObject *parent = nullptr);
-    RequestDispatcher(NetworkClient *networkClient, qint64 requestTimeoutMs = 5000, QObject *parent = nullptr);
+    RequestDispatcher(NetworkClient *networkClient, int requestTimeoutMs, QObject *parent = nullptr);
 
     MiniCloud::Client::RequestSendResult sendRequest(MiniCloud::Protocol::MessageType requestType, MiniCloud::Protocol::TaskId taskId, const QByteArray &payload, MiniCloud::Client::RequestDestination destination);
 
@@ -51,4 +51,6 @@ private:
     MiniCloud::Protocol::RequestId m_nextRequestId = 1;
     QTimer *m_timeoutTimer = nullptr;
     qint64 m_requestTimeoutMs;
+
+    MiniCloud::Protocol::RequestId generateRequestId();
 };
