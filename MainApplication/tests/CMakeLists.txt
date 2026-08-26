@@ -141,3 +141,31 @@ add_test(
 add_test(
     NAME RequestDispatcherTests.response_wrongMessageType_removesPendingAndEmitsResponseTypeMismatch
     COMMAND RequestDispatcherTests response_wrongMessageType_removesPendingAndEmitsResponseTypeMismatch)
+
+add_test(
+    NAME RequestDispatcherTests.errorResponse_matchingRequest_removesPendingAndEmitsRemoteError
+    COMMAND RequestDispatcherTests errorResponse_matchingRequest_removesPendingAndEmitsRemoteError)
+
+add_test(
+    NAME RequestDispatcherTests.errorResponse_malformedPayload_removesPendingAndEmitsInvalidResponsePayload
+    COMMAND RequestDispatcherTests errorResponse_malformedPayload_removesPendingAndEmitsInvalidResponsePayload)
+
+add_test(
+    NAME RequestDispatcherTests.disconnect_withPendingRequests_clearsAllAndEmitsConnectionLostForEach
+    COMMAND RequestDispatcherTests disconnect_withPendingRequests_clearsAllAndEmitsConnectionLostForEach)
+
+add_test(
+    NAME RequestDispatcherTests.pendingRequest_whenDeadlineExpires_emitsRequestTimeout
+    COMMAND RequestDispatcherTests pendingRequest_whenDeadlineExpires_emitsRequestTimeout)
+
+add_test(
+    NAME RequestDispatcherTests.response_afterTimeout_isIgnoredAndDoesNotCompleteTwice
+    COMMAND RequestDispatcherTests response_afterTimeout_isIgnoredAndDoesNotCompleteTwice) 
+
+add_test(
+    NAME RequestDispatcherTests.response_beforeDeadline_doesNotEmitTimeoutLater
+    COMMAND RequestDispatcherTests response_beforeDeadline_doesNotEmitTimeoutLater)
+
+add_test(
+    NAME RequestDispatcherTests.responses_outOfOrder_areCorrelatedByRequestId
+    COMMAND RequestDispatcherTests responses_outOfOrder_areCorrelatedByRequestId)
