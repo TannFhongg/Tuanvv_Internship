@@ -3,8 +3,9 @@
 #include <QByteArray>
 #include <QString>
 #include <QJsonObject>
-
+#include <QMetaType>
 #include "protocoltypes.h"
+
 
 namespace MiniCloud::Protocol
 {
@@ -44,3 +45,5 @@ namespace MiniCloud::Protocol
     ErrorResponseEncodeResult serializeErrorResponse(const ErrorResponseData &data);
     ErrorResponseDecodeResult deserializeErrorResponse(const QByteArray &payload);
 }
+
+Q_DECLARE_METATYPE(MiniCloud::Protocol::ErrorResponseData)
