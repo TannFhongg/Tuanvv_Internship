@@ -4,6 +4,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
+#include <QSaveFile>
 
 #include <cmath>
 #include "licenserepository.h"
@@ -78,9 +79,9 @@ LicenseRepositoryResult LicenseRepository::load()
         }
 
         const QJsonObject licenseObject = licenseValue.toObject();
-        const QJsonValue  productKeyValue = licenseObject.value(QStringLiteral("productKey"));
-        const QJsonValue  deviceIdValue = licenseObject.value(QStringLiteral("deviceId"));
-        const QJsonValue  enabledValue = licenseObject.value(QStringLiteral("enabled"));
+        const QJsonValue productKeyValue = licenseObject.value(QStringLiteral("productKey"));
+        const QJsonValue deviceIdValue = licenseObject.value(QStringLiteral("deviceId"));
+        const QJsonValue enabledValue = licenseObject.value(QStringLiteral("enabled"));
 
         if (!productKeyValue.isString() || productKeyValue.toString().isEmpty())
         {
@@ -138,4 +139,119 @@ std::optional<LicenseRecord> LicenseRepository::findByProductKey(const QString &
         return std::nullopt;
     }
     return *iterator;
+}
+
+LicenseRepositoryResult LicenseRepository::insert(const LicenseRecord &record)
+
+{
+    LicenseRepositoryResult result;
+    if (record.productKey.isEmpty())
+    {
+        result.errorMessage = QStringLiteral("Product key cannot be empty.");
+        return result;
+    }
+
+    if (m_records.contains(record.productKey))
+    {
+        result.errorMessage = QStringLiteral("Product key already exists: %1").arg(record.productKey);
+        return result;
+    }
+
+    QHash<QString, LicenseRecord> candidate = m_records;
+    candidate.insert(record.productKey, record);
+
+    const LicenseRepositoryResult saveResult = saveRecords(candidate);
+
+    if (saveResult.status == LicenseRepositoryStatus::Failed)
+    {
+        return saveResult;
+    }
+
+    m_records = std::move(candidate);
+
+    result.status = LicenseRepositoryStatus::Success;
+    return result;
+}
+
+LicenseRepositoryResult LicenseRepository::update(const LicenseRecord &record)
+{
+    LicenseRepositoryResult result;
+
+    if (record.productKey.isEmpty())
+    {
+        result.errorMessage = QStringLiteral("Product key cannot be empty.");
+        return result;
+    }
+
+    if (!m_records.contains(record.productKey))
+    {
+        result.errorMessage = QStringLiteral(
+            "Product key does not exist: %1").arg(record.productKey);
+        return result;
+    }
+
+    QHash<QString, LicenseRecord> candidate = m_records;
+    candidate[record.productKey] = record;
+
+    const LicenseRepositoryResult saveResult = saveRecords(candidate);
+
+    if (saveResult.status == LicenseRepositoryStatus::Failed)
+    {
+        return saveResult;
+    }
+
+    m_records = std::move(candidate);
+
+    result.status = LicenseRepositoryStatus::Success;
+    return result;
+}
+
+LicenseRepositoryResult LicenseRepository::saveRecords(const QHash<QString, LicenseRecord> &records) const
+{
+    LicenseRepositoryResult result;
+    QJsonArray licensesArray;
+
+    for (const LicenseRecord &record : records)
+    {
+        QJsonObject recordObject;
+        recordObject.insert(QStringLiteral("productKey"), record.productKey);
+        recordObject.insert(QStringLiteral("deviceId"), record.deviceId);
+        recordObject.insert(QStringLiteral("enabled"), record.enabled);
+
+        licensesArray.append(recordObject);
+    }
+    QJsonObject rootObject;
+    rootObject.insert(QStringLiteral("schemaVersion"), 1);
+    rootObject.insert(QStringLiteral("licenses"), licensesArray);
+
+    QJsonDocument document(rootObject);
+    const QByteArray payload = document.toJson(QJsonDocument::Compact);
+
+    QSaveFile file(m_filePath);
+
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+    {
+        result.errorMessage = QStringLiteral("Failed to open file for writing: %1").arg(m_filePath);
+        return result;
+    }
+
+    qint64 writtenBytes = file.write(payload);
+
+    if (writtenBytes != payload.size())
+    {
+        file.cancelWriting();
+        LicenseRepositoryResult result;
+        result.errorMessage = QStringLiteral("Failed to write all data to file: %1").arg(m_filePath);
+        return result;
+    }
+
+    if (!file.commit())
+    {
+        LicenseRepositoryResult result;
+        result.errorMessage = QStringLiteral("Failed to commit changes to file: %1").arg(m_filePath);
+        return result;
+    }
+
+    result.status = LicenseRepositoryStatus::Success;
+    return result;
 }

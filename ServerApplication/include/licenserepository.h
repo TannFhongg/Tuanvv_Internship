@@ -28,7 +28,12 @@ public:
 
     std::optional<LicenseRecord> findByProductKey(const QString &productKey) const;
 
+    LicenseRepositoryResult insert(const LicenseRecord &record);
+    LicenseRepositoryResult update(const LicenseRecord &record);
+
 private:
     QString m_filePath;
     QHash<QString, LicenseRecord> m_records;
+
+    LicenseRepositoryResult saveRecords(const QHash<QString, LicenseRecord> &records) const;
 };
