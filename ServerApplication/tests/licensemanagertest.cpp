@@ -392,6 +392,133 @@ private slots:
         QCOMPARE(reloadedRecord->deviceId, QString());
         QCOMPARE(reloadedRecord->enabled, true);
     }
+
+    void createLicense_beforeInitialization_fails()
+    {
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString filePath = temporaryDirectory.filePath(QStringLiteral("licenses.json"));
+
+        QVERIFY(!QFileInfo::exists(filePath));
+
+        LicenseManager manager(filePath);
+
+        QVERIFY(!manager.isInitialized());
+
+        const auto result = manager.createLicense();
+
+        QCOMPARE(result.operationStatus, LicenseManagerOperationStatus::Failed);
+        QVERIFY(result.productKey.isEmpty());
+        QVERIFY(!result.errorMessage.isEmpty());
+    }
+
+    void createLicense_afterInitialization_persistsEnabledUnboundLicense()
+    {
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString filePath = temporaryDirectory.filePath(QStringLiteral("licenses.json"));
+
+        QVERIFY(!QFileInfo::exists(filePath));
+
+        LicenseManager manager(filePath);
+
+        QVERIFY(!manager.isInitialized());
+
+        const LicenseManagerResult initResult = manager.initialize();
+        QCOMPARE(initResult.status, LicenseManagerOperationStatus::Success);
+        QVERIFY(initResult.errorMessage.isEmpty());
+        QVERIFY(manager.isInitialized());
+
+        const auto result = manager.createLicense();
+
+        QCOMPARE(result.operationStatus, LicenseManagerOperationStatus::Success);
+        QVERIFY(!result.productKey.isEmpty());
+        QVERIFY(result.errorMessage.isEmpty());
+
+        LicenseRepository reloadedRepository(filePath);
+        const LicenseRepositoryResult reloadResult = reloadedRepository.load();
+        QCOMPARE(reloadResult.status, LicenseRepositoryStatus::Success);
+        QVERIFY(reloadResult.errorMessage.isEmpty());
+    }
+
+    void createLicense_twice_generatesDistinctPersistedKeys()
+    {
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString filePath = temporaryDirectory.filePath(QStringLiteral("licenses.json"));
+
+        QVERIFY(!QFileInfo::exists(filePath));
+
+        LicenseManager manager(filePath);
+
+        QVERIFY(!manager.isInitialized());
+
+        const LicenseManagerResult initResult = manager.initialize();
+        QCOMPARE(initResult.status, LicenseManagerOperationStatus::Success);
+        QVERIFY(initResult.errorMessage.isEmpty());
+        QVERIFY(manager.isInitialized());
+
+        const auto result1 = manager.createLicense();
+        QCOMPARE(result1.operationStatus, LicenseManagerOperationStatus::Success);
+        QVERIFY(!result1.productKey.isEmpty());
+        QVERIFY(result1.errorMessage.isEmpty());
+
+        const auto result2 = manager.createLicense();
+        QCOMPARE(result2.operationStatus, LicenseManagerOperationStatus::Success);
+        QVERIFY(!result2.productKey.isEmpty());
+        QVERIFY(result2.errorMessage.isEmpty());
+
+        QVERIFY(result1.productKey != result2.productKey);
+
+        LicenseRepository loadedRepository(filePath);
+        const LicenseRepositoryResult reloadResult = loadedRepository.load();
+        QCOMPARE(reloadResult.status, LicenseRepositoryStatus::Success);
+        QVERIFY(reloadResult.errorMessage.isEmpty());
+
+        std::optional<LicenseRecord> reloadedRecord1 = loadedRepository.findByProductKey(result1.productKey);
+        QVERIFY(reloadedRecord1.has_value());
+        QCOMPARE(reloadedRecord1->productKey, result1.productKey);
+        QCOMPARE(reloadedRecord1->deviceId, QString());
+        QVERIFY(reloadedRecord1->enabled);
+
+        std::optional<LicenseRecord> reloadedRecord2 = loadedRepository.findByProductKey(result2.productKey);
+        QVERIFY(reloadedRecord2.has_value());
+        QCOMPARE(reloadedRecord2->productKey, result2.productKey);
+        QCOMPARE(reloadedRecord2->deviceId, QString());
+        QVERIFY(reloadedRecord2->enabled);
+    }
+
+    void createLicense_persistenceFails_returnsFailureWithoutProductKey()
+    {
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString missingParentPath = temporaryDirectory.filePath(QStringLiteral("missing-parent"));
+
+        const QString filePath = QDir(missingParentPath).filePath(QStringLiteral("licenses.json"));
+
+        QVERIFY(!QDir(missingParentPath).exists());
+        QVERIFY(!QFileInfo::exists(filePath));
+
+        LicenseManager manager(filePath);
+        QVERIFY(!manager.isInitialized());
+
+        const LicenseManagerResult initResult = manager.initialize();
+        QCOMPARE(initResult.status, LicenseManagerOperationStatus::Success);
+        QVERIFY(initResult.errorMessage.isEmpty());
+        QVERIFY(manager.isInitialized());
+
+        const auto result = manager.createLicense();
+
+        QCOMPARE(result.operationStatus, LicenseManagerOperationStatus::Failed);
+        QVERIFY(result.productKey.isEmpty());
+        QVERIFY(!result.errorMessage.isEmpty());
+    }
 };
 
 QTEST_MAIN(LicenseManagerTest)

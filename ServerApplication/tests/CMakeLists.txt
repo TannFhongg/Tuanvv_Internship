@@ -159,3 +159,23 @@ add_test(
     NAME LicenseManagerTest.authenticate_unboundLicensePersistenceFails_returnsOperationFailure
     COMMAND LicenseManagerTest authenticate_unboundLicensePersistenceFails_returnsOperationFailure
 )
+
+add_test(
+    NAME LicenseManagerTest.createLicense_beforeInitialization_fails
+    COMMAND LicenseManagerTest createLicense_beforeInitialization_fails
+)
+
+add_test(
+    NAME LicenseManagerTest.createLicense_afterInitialization_persistsEnabledUnboundLicense
+    COMMAND LicenseManagerTest createLicense_afterInitialization_persistsEnabledUnboundLicense
+)
+
+add_test(
+    NAME LicenseManagerTest.createLicense_twice_generatesDistinctPersistedKeys
+    COMMAND LicenseManagerTest createLicense_twice_generatesDistinctPersistedKeys
+)
+
+add_test(
+    NAME LicenseManagerTest.createLicense_persistenceFails_returnsFailureWithoutProductKey
+    COMMAND LicenseManagerTest createLicense_persistenceFails_returnsFailureWithoutProductKey
+)
