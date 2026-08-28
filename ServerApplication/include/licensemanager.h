@@ -25,6 +25,13 @@ namespace MiniCloud::Server
         QString errorMessage;
     };
 
+    struct CreateLicenseResult
+    {
+        LicenseManagerOperationStatus operationStatus{LicenseManagerOperationStatus::Failed};
+        QString productKey;
+        QString errorMessage;
+    };
+
     class LicenseManager
     {
     public:
@@ -36,8 +43,11 @@ namespace MiniCloud::Server
 
         MiniCloud::Server::AuthenticationResult authenticate(const QString &productKey, const QString &deviceId);
 
+        MiniCloud::Server::CreateLicenseResult createLicense();
+
     private:
         LicenseRepository m_repository;
         bool m_initialized{false};
+        QString generateCandidateProductKey() const;
     };
 }

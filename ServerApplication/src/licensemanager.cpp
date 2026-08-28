@@ -1,7 +1,7 @@
 #include "licensemanager.h"
 #include <utility>
 #include "licenserepository.h"
-
+#include <QRandomGenerator>
 namespace MiniCloud::Server
 {
     LicenseManager::LicenseManager(QString repositoryFilePath)
@@ -92,7 +92,7 @@ namespace MiniCloud::Server
             result.authenticationStatus = MiniCloud::Protocol::AuthenticationStatus::Valid;
             return result;
         }
-        
+
         if (record->deviceId != deviceId)
         {
             result.operationStatus = LicenseManagerOperationStatus::Success;
@@ -104,4 +104,53 @@ namespace MiniCloud::Server
         return result;
     }
 
+    MiniCloud::Server::CreateLicenseResult LicenseManager::createLicense()
+    {
+        MiniCloud::Server::CreateLicenseResult result;
+
+        if (!m_initialized)
+        {
+            result.errorMessage = "LicenseManager is not initialized.";
+            return result;
+        }
+
+        constexpr int maxAttempts = 100;
+
+        for (int attempt = 0; attempt < maxAttempts; ++attempt)
+        {
+            const QString candidate = generateCandidateProductKey();
+
+            if (m_repository.findByProductKey(candidate).has_value())
+            {
+                continue;
+            }
+
+            const LicenseRecord record{
+                candidate,
+                QString(),
+                true};
+
+            const LicenseRepositoryResult insertResult = m_repository.insert(record);
+            if (insertResult.status == LicenseRepositoryStatus::Failed)
+            {
+                result.errorMessage = insertResult.errorMessage;
+                return result;
+            }
+
+            result.operationStatus = LicenseManagerOperationStatus::Success;
+            result.productKey = candidate;
+            return result;
+        }
+
+        result.errorMessage = "Unable to generate a unique Product Key.";
+        return result;
+    }
+
+    QString LicenseManager::generateCandidateProductKey() const
+    {
+        const quint64 randomValue = QRandomGenerator::system()->generate64();
+
+        const QString hex = QStringLiteral("%1").arg(randomValue, 16, 16, QLatin1Char('0')).toUpper();
+        return hex;
+    }
 }
