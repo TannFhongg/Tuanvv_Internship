@@ -1,5 +1,6 @@
 #include <NetworkClient.h>
 #include "protocolcodec.h"
+#include "protocolconstants.h"
 NetworkClient::NetworkClient(QObject *parent)
     : QObject(parent), m_socket(new QTcpSocket(this))
 {
@@ -125,7 +126,7 @@ void NetworkClient::processBufferedFrames()
         case MiniCloud::Protocol::FrameParser::FrameParseStatus::NeedMoreData:
             return;
         case MiniCloud::Protocol::FrameParser::FrameParseStatus::Failed:
-            emit protocolError(result.errorCode,QStringLiteral("Failed"));
+            emit protocolError(result.errorCode, QStringLiteral("Failed"));
             m_frameParser.clear();
             m_socket->abort();
             return;
@@ -144,4 +145,3 @@ void NetworkClient::onReadyRead()
 
     processBufferedFrames();
 }
-
