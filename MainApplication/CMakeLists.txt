@@ -17,7 +17,10 @@ set_target_properties(MainApplication PROPERTIES
 
 add_library(MainCore STATIC
     src/NetworkClient.cpp
+    src/requestdispatcher.cpp
     include/NetworkClient.h
+    include/requestdispatcher.h
+    include/requesttypes.h
 )
 
 target_include_directories(MainCore
@@ -31,6 +34,8 @@ target_link_libraries(MainCore
     PRIVATE
     Qt6::Core
 )
+
+
 target_link_libraries(MainApplication
     PRIVATE
     Qt6::Widgets

@@ -5,11 +5,18 @@ target_sources(ProtocolCommon
     PRIVATE
         src/protocolcommon.cpp
         src/protocolcodec.cpp
+        src/frameparser.cpp
+        src/errorresponse.cpp
+        src/authentication.cpp
 
         include/protocolconstants.h
         include/protocoltypes.h
         include/protocolheader.h
         include/protocolcodec.h
+        include/frameparser.h
+        include/protocolframe.h
+        include/errorresponse.h
+        include/authentication.h
 )
 
 

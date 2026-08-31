@@ -18,9 +18,14 @@ set_target_properties(ServerApplication PROPERTIES
 add_library(ServerCore STATIC
     src/TcpServer.cpp
     src/ClientSession.cpp
+    src/licenserepository.cpp
+    src/licensemanager.cpp
 
+    include/licensemanager.h
     include/TcpServer.h
     include/ClientSession.h
+    include/licenserepository.h
+    include/licenserecord.h
 )
 target_include_directories(ServerCore
     PUBLIC
@@ -28,10 +33,9 @@ target_include_directories(ServerCore
 )
 target_link_libraries(ServerCore
     PUBLIC
+    Qt6::Core
     Qt6::Network
     ProtocolCommon
-    PRIVATE
-    Qt6::Core
 )
 
 target_link_libraries(ServerApplication
