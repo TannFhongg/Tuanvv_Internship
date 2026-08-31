@@ -1,4 +1,6 @@
 #include "frameparser.h"
+#include "protocolheader.h"
+#include "protocolcodec.h"
 #include "protocolconstants.h"
 
 namespace MiniCloud::Protocol
@@ -14,7 +16,7 @@ namespace MiniCloud::Protocol
 
     FrameParser::FrameParseResult FrameParser::tryTakeFrame()
     {
-        const HeaderDecodeResult decodeResult = deserializeHeader(receiveBuffer);
+        const HeaderDecodeResult decodeResult = MiniCloud::Protocol::deserializeHeader(receiveBuffer);
 
         if (decodeResult.status == HeaderDecodeStatus::NeedMoreData)
         {
@@ -27,7 +29,7 @@ namespace MiniCloud::Protocol
             return {FrameParseStatus::Failed, {}, decodeResult.errorCode};
         }
 
-        const qsizetype headerSize = static_cast<qsizetype>(protocolWireHeaderSize);
+        const qsizetype headerSize = static_cast<qsizetype>(MiniCloud::Protocol::protocolWireHeaderSize);
         const qsizetype payloadSize = static_cast<qsizetype>(decodeResult.header.payloadLength);
         const qsizetype frameSize = headerSize + payloadSize;
 
@@ -50,7 +52,7 @@ namespace MiniCloud::Protocol
         receiveBuffer.clear();
     }
 
-    qsizetype FrameParser::bufferedSize()
+    qsizetype FrameParser::bufferedSize() const
     {
         return receiveBuffer.size();
     }
