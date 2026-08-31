@@ -7,6 +7,8 @@
 #include "protocolframe.h"
 #include <QString>
 
+class ServerRequestDispatcher;
+
 class ClientSession : public QObject
 {
     Q_OBJECT
@@ -19,6 +21,7 @@ public:
         MiniCloud::Protocol::RequestId requestId,
         MiniCloud::Protocol::TaskId taskId,
         const QByteArray &payload);
+    bool isAuthenticated() const noexcept;
 
 signals:
     void sessionFinished(ClientSession *session);
@@ -30,8 +33,13 @@ private slots:
     void onReadyRead();
 
 private:
+    friend class ServerRequestDispatcher;
+
     QTcpSocket *m_socket = nullptr;
     MiniCloud::Protocol::FrameParser m_frameParser;
 
     void processBufferedFrames();
+    void markAuthenticated() noexcept;
+
+    bool m_authenticated{false};
 };

@@ -22,6 +22,7 @@ ClientSession::ClientSession(QTcpSocket *socket, QObject *parent)
 
 void ClientSession::onDisconnected()
 {
+    m_authenticated = false;
     m_frameParser.clear();
     emit sessionFinished(this);
 }
@@ -97,4 +98,14 @@ void ClientSession::processBufferedFrames()
             continue;
         }
     }
+}
+
+bool ClientSession::isAuthenticated() const noexcept
+{
+    return m_authenticated;
+}
+
+void ClientSession::markAuthenticated() noexcept
+{
+    m_authenticated = true;
 }
