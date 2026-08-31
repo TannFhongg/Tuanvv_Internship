@@ -1,4 +1,6 @@
 #pragma once
+#include <functional>
+#include <QtGlobal>
 #include <QString>
 #include "licenserepository.h"
 #include "authentication.h"
@@ -35,7 +37,11 @@ namespace MiniCloud::Server
     class LicenseManager
     {
     public:
-        explicit LicenseManager(QString repositoryFilePath);
+        using EntropySource = std::function<quint64()>;
+
+        explicit LicenseManager(
+            QString repositoryFilePath,
+            EntropySource entropySource = {});
 
         LicenseManagerResult initialize();
 
@@ -45,9 +51,16 @@ namespace MiniCloud::Server
 
         MiniCloud::Server::CreateLicenseResult createLicense();
 
+        LicenseManagerResult disableLicense(const QString &productKey);
+        LicenseManagerResult enableLicense(const QString &productKey);
+
+
     private:
         LicenseRepository m_repository;
+        EntropySource m_entropySource;
         bool m_initialized{false};
         QString generateCandidateProductKey() const;
+
+        LicenseManagerResult setLicenseEnabled(const QString &productKey,bool enabled);
     };
 }

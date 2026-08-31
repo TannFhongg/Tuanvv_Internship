@@ -4,8 +4,11 @@
 #include <QRandomGenerator>
 namespace MiniCloud::Server
 {
-    LicenseManager::LicenseManager(QString repositoryFilePath)
+    LicenseManager::LicenseManager(
+        QString repositoryFilePath,
+        LicenseManager::EntropySource entropySource)
         : m_repository(std::move(repositoryFilePath))
+        , m_entropySource(std::move(entropySource))
     {
     }
 
@@ -148,9 +151,101 @@ namespace MiniCloud::Server
 
     QString LicenseManager::generateCandidateProductKey() const
     {
-        const quint64 randomValue = QRandomGenerator::system()->generate64();
+        const quint64 randomValue = m_entropySource
+            ? m_entropySource()
+            : QRandomGenerator::system()->generate64();
 
         const QString hex = QStringLiteral("%1").arg(randomValue, 16, 16, QLatin1Char('0')).toUpper();
-        return hex;
+        return QStringLiteral("MCLD-%1-%2-%3-%4")
+            .arg(hex.left(4), hex.mid(4, 4), hex.mid(8, 4), hex.right(4));
+    }
+
+    LicenseManagerResult LicenseManager::disableLicense(const QString &productKey)
+    {
+        LicenseManagerResult result;
+
+        if (!m_initialized)
+        {
+            result.errorMessage = "LicenseManager is not initialized.";
+            return result;
+        }
+
+        if (productKey.trimmed().isEmpty())
+        {
+            result.errorMessage = "Product key is required.";
+            return result;
+        }
+
+        const std::optional<LicenseRecord> record = m_repository.findByProductKey(productKey);
+        if (!record.has_value())
+        {
+            result.errorMessage = "Product key not found.";
+            return result;
+        }
+        if (!record->enabled)
+        {
+            result.status = LicenseManagerOperationStatus::Success;
+            return result;
+        }
+
+        LicenseRecord updatedRecord = record.value();
+        updatedRecord.enabled = false;
+
+        const LicenseRepositoryResult updateResult = m_repository.update(updatedRecord);
+        if (updateResult.status == LicenseRepositoryStatus::Failed)
+        {
+            result.errorMessage = updateResult.errorMessage;
+            return result;
+        }
+
+        result.status = LicenseManagerOperationStatus::Success;
+        return result;
+    }
+
+    LicenseManagerResult LicenseManager::enableLicense(const QString &productKey)
+    {
+        return setLicenseEnabled(productKey, true);
+    }
+
+    LicenseManagerResult LicenseManager::setLicenseEnabled(const QString &productKey, bool enabled)
+    {
+        LicenseManagerResult result;
+
+        if (!m_initialized)
+        {
+            result.errorMessage = "LicenseManager is not initialized.";
+            return result;
+        }
+
+        if (productKey.trimmed().isEmpty())
+        {
+            result.errorMessage = "Product key is required.";
+            return result;
+        }
+
+        const std::optional<LicenseRecord> record = m_repository.findByProductKey(productKey);
+        if (!record.has_value())
+        {
+            result.errorMessage = "Product key not found.";
+            return result;
+        }
+        if (record->enabled == enabled)
+        {
+            result.status = LicenseManagerOperationStatus::Success;
+            return result;
+        }
+
+        LicenseRecord updatedRecord = record.value();
+        updatedRecord.enabled = enabled;
+
+        const LicenseRepositoryResult updateResult = m_repository.update(updatedRecord);
+        if (updateResult.status == LicenseRepositoryStatus::Failed)
+        {
+            result.errorMessage = updateResult.errorMessage;
+            return result;
+        }
+
+        result.status = LicenseManagerOperationStatus::Success;
+        return result;
     }
 }
