@@ -20,12 +20,14 @@ add_library(ServerCore STATIC
     src/ClientSession.cpp
     src/licenserepository.cpp
     src/licensemanager.cpp
+    src/ServerRequestDispatcher.cpp
 
     include/licensemanager.h
     include/TcpServer.h
     include/ClientSession.h
     include/licenserepository.h
     include/licenserecord.h
+    include/ServerRequestDispatcher.h
 )
 target_include_directories(ServerCore
     PUBLIC
