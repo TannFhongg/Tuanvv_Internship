@@ -94,7 +94,7 @@ void ClientSession::processBufferedFrames()
         if (result.status == MiniCloud::Protocol::FrameParser::FrameParseStatus::FrameReady)
         {
             emit frameReceived(this, result.frame);
-            break;
+            continue;
         }
     }
 }
