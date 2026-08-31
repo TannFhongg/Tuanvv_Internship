@@ -12,6 +12,7 @@ namespace MiniCloud::Protocol
         ProtocolHeader header;
         QByteArray payload;
     };
+    
 }
 
 Q_DECLARE_METATYPE(MiniCloud::Protocol::ProtocolFrame)
