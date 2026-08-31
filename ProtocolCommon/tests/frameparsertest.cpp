@@ -2,7 +2,8 @@
 #include "frameparser.h"
 #include "protocolheader.h"
 #include "protocolconstants.h"
-
+#include "protocolframe.h"
+#include "protocolcodec.h"
 class FrameParserTest : public QObject
 {
     Q_OBJECT
@@ -211,6 +212,97 @@ private slots:
         QCOMPARE(result_B.status, MiniCloud::Protocol::FrameParser::FrameParseStatus::FrameReady);
         QCOMPARE(result_B.errorCode, MiniCloud::Protocol::ErrorCode::None);
     }
+
+    void tryTakeFrame_invalidMagic_returnsFailedAndClearsBuffer()
+    {
+        MiniCloud::Protocol::FrameParser parser;
+        MiniCloud::Protocol::ProtocolHeader header_A;
+        header_A.protocolMagic = MiniCloud::Protocol::protocolMagic;
+        header_A.protocolVersion = MiniCloud::Protocol::protocolVersion;
+        header_A.messageType = MiniCloud::Protocol::MessageType::AuthenticateRequest;
+        header_A.requestId = 101;
+        header_A.taskId = 0;
+        const QByteArray payload_A = QByteArray::fromHex("CA FE BA BE 02");
+        QByteArray frame_A = makeFrame(header_A, payload_A);
+        frame_A[0] = 0x00;
+
+        MiniCloud::Protocol::ProtocolHeader header_B;
+        header_B.protocolMagic = MiniCloud::Protocol::protocolMagic;
+        header_B.protocolVersion = MiniCloud::Protocol::protocolVersion;
+        header_B.messageType = MiniCloud::Protocol::MessageType::AuthenticateRequest;
+        header_B.requestId = 102;
+        header_B.taskId = 0;
+        const QByteArray payload_B = QByteArray::fromHex("CA FE BA BE 03");
+        QByteArray frame_B = makeFrame(header_B, payload_B);
+
+        parser.appendData(frame_A + frame_B);
+        QCOMPARE(parser.bufferedSize(), static_cast<qsizetype>(frame_A.size() + frame_B.size()));
+        const MiniCloud::Protocol::FrameParser::FrameParseResult result_A = parser.tryTakeFrame();
+        QCOMPARE(result_A.status, MiniCloud::Protocol::FrameParser::FrameParseStatus::Failed);
+        QCOMPARE(result_A.errorCode, MiniCloud::Protocol::ErrorCode::InvalidFrame);
+
+        QCOMPARE(parser.bufferedSize(), static_cast<qsizetype>(0));
+        const MiniCloud::Protocol::FrameParser::FrameParseResult result_B = parser.tryTakeFrame();
+        QCOMPARE(result_B.status, MiniCloud::Protocol::FrameParser::FrameParseStatus::NeedMoreData);
+        QCOMPARE(result_B.frame.header.protocolMagic, static_cast<quint32>(0));
+        QCOMPARE(parser.bufferedSize(), static_cast<qsizetype>(0));
+    }
+
+    void tryTakeFrame_zeroLengthPayload_returnsFrameReady()
+    {
+        MiniCloud::Protocol::FrameParser parser;
+        MiniCloud::Protocol::ProtocolHeader header;
+
+        header.protocolMagic = MiniCloud::Protocol::protocolMagic;
+        header.protocolVersion = MiniCloud::Protocol::protocolVersion;
+        header.messageType = MiniCloud::Protocol::MessageType::AuthenticateRequest;
+        header.requestId = 0;
+        header.taskId = 0;
+        const QByteArray payload = QByteArray::fromHex("");
+        QByteArray frame = makeFrame(header, payload);
+
+        parser.appendData(frame);
+        MiniCloud::Protocol::FrameParser::FrameParseResult result = parser.tryTakeFrame();
+        QCOMPARE(parser.bufferedSize(), static_cast<qsizetype>(0));
+        QCOMPARE(result.status, MiniCloud::Protocol::FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(result.frame.header.protocolMagic, MiniCloud::Protocol::protocolMagic);
+        QCOMPARE(result.frame.header.protocolVersion, MiniCloud::Protocol::protocolVersion);
+        QCOMPARE(result.frame.header.messageType, MiniCloud::Protocol::MessageType::AuthenticateRequest);
+        QCOMPARE(result.frame.header.payloadLength, static_cast<quint32>(0));
+        QCOMPARE(result.frame.header.requestId, static_cast<quint64>(0));
+        QCOMPARE(result.frame.header.taskId, static_cast<quint64>(0));
+        QCOMPARE(result.frame.payload, payload);
+        QCOMPARE(result.errorCode, MiniCloud::Protocol::ErrorCode::None);
+    }
+
+    void clear_bufferedData_removesAllBytes()
+    {
+        MiniCloud::Protocol::FrameParser parser;
+
+        MiniCloud::Protocol::ProtocolHeader header;
+        header.protocolMagic = MiniCloud::Protocol::protocolMagic;
+        header.protocolVersion = MiniCloud::Protocol::protocolVersion;
+        header.messageType = MiniCloud::Protocol::MessageType::AuthenticateRequest;
+        header.requestId = 0;
+        header.taskId = 0;
+
+        const QByteArray payload = QByteArray::fromHex("");
+        const QByteArray frame = makeFrame(header, payload);
+        parser.appendData(frame);
+
+        if (parser.bufferedSize() > static_cast<qsizetype>(0))
+        {
+            parser.clear();
+        }
+
+        QCOMPARE(parser.bufferedSize() , static_cast<qsizetype>(0));
+        MiniCloud::Protocol::FrameParser::FrameParseResult result = parser.tryTakeFrame();
+        QCOMPARE(result.status , MiniCloud::Protocol::FrameParser::FrameParseStatus::NeedMoreData);
+        QCOMPARE(result.errorCode , MiniCloud::Protocol::ErrorCode::None);
+        QCOMPARE(parser.bufferedSize() , static_cast<qsizetype>(0));
+    }
+
+    
 };
 
 QTEST_APPLESS_MAIN(FrameParserTest)

@@ -8,6 +8,10 @@ add_executable(ErrorResponseCodecTests
     errorresponsetest.cpp
 )
 
+add_executable(AuthenticationCodecTests
+    authenticationcodectest.cpp
+)
+
 target_link_libraries(ProtocolCommonTests
     PRIVATE
     ProtocolCommon
@@ -25,6 +29,11 @@ target_link_libraries(ErrorResponseCodecTests
     Qt6::Test
 )
 
+target_link_libraries(AuthenticationCodecTests
+    PRIVATE
+    ProtocolCommon
+    Qt6::Test
+)
 add_test(NAME Protocol.encode
     COMMAND ProtocolCommonTests encode)
 
@@ -153,3 +162,42 @@ add_test(
 add_test(
     NAME ErrorResponseCodecTests.deserializeErrorResponse_fractionalErrorCode_returnsFailed
     COMMAND ErrorResponseCodecTests deserializeErrorResponse_fractionalErrorCode_returnsFailed)
+
+add_test(
+    NAME AuthenticationCodecTests
+    COMMAND AuthenticationCodecTests)
+
+add_test(NAME AuthenticationCodecTests.authenticateRequest_validData_roundTripsSuccessfully
+    COMMAND AuthenticationCodecTests authenticateRequest_validData_roundTripsSuccessfully)
+
+add_test(
+    NAME AuthenticationCodecTests.authenticateResponse_validStatuses_roundTrip
+    COMMAND AuthenticationCodecTests authenticateResponse_validStatuses_roundTrip)
+
+add_test(
+    NAME AuthenticationCodecTests.authenticateResponse_invalidStatuses_serializeFails
+    COMMAND AuthenticationCodecTests authenticateResponse_invalidStatuses_serializeFails)
+
+add_test(
+    NAME AuthenticationCodecTests.authenticateResponse_invalidWireStatuses_deserializeFails
+    COMMAND AuthenticationCodecTests authenticateResponse_invalidWireStatuses_deserializeFails)
+
+add_test(
+    NAME AuthenticationCodecTests.authenticateRequest_emptyRequiredField_serializeFails
+    COMMAND AuthenticationCodecTests authenticateRequest_emptyRequiredField_serializeFails)
+
+add_test(
+    NAME AuthenticationCodecTests.authenticateRequest_invalidPayload_deserializeFails
+    COMMAND AuthenticationCodecTests authenticateRequest_invalidPayload_deserializeFails)
+
+add_test(
+    NAME AuthenticationCodecTests.authenticateResponse_invalidPayload_deserializeFails
+    COMMAND AuthenticationCodecTests authenticateResponse_invalidPayload_deserializeFails)
+
+add_test(
+    NAME AuthenticationCodecTests.authenticateRequest_extraFields_areIgnored
+    COMMAND AuthenticationCodecTests authenticateRequest_extraFields_areIgnored)
+
+add_test(
+    NAME AuthenticationCodecTests.authenticateResponse_extraFields_areIgnored
+    COMMAND AuthenticationCodecTests authenticateResponse_extraFields_areIgnored)
