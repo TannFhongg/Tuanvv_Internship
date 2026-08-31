@@ -1,7 +1,5 @@
 #pragma once
-#include "protocolheader.h"
-#include "protocolcodec.h"
-#include "protocolconstants.h"
+#include "protocolframe.h"
 #include <QByteArray>
 
 namespace MiniCloud::Protocol
@@ -9,11 +7,6 @@ namespace MiniCloud::Protocol
     class FrameParser
     {
     public:
-        struct ProtocolFrame
-        {
-            ProtocolHeader header;
-            QByteArray payload;
-        };
         enum class FrameParseStatus
         {
             FrameReady,
@@ -30,10 +23,9 @@ namespace MiniCloud::Protocol
         void appendData(const QByteArray &data);
         FrameParseResult tryTakeFrame();
         void clear();
-        qsizetype bufferedSize();
+        qsizetype bufferedSize() const;
 
     private:
         QByteArray receiveBuffer;
     };
-
 }
