@@ -27,6 +27,17 @@ target_link_libraries(LicenseManagerTest PRIVATE
     Qt6::Core
 )
 
+add_executable(ServerRequestDispatcherTest
+    serverrequestdispatchertest.cpp
+)
+
+target_link_libraries(ServerRequestDispatcherTest PRIVATE
+    ServerCore
+    Qt6::Test
+    Qt6::Network
+)
+
+
 add_test(
     NAME LicenseManagerTest
     COMMAND LicenseManagerTest
@@ -259,4 +270,47 @@ add_test(
     NAME LicenseManagerTest.listLicenses_multipleRecords_returnsAllFieldsInDeterministicOrderWithoutRewrite
     COMMAND LicenseManagerTest listLicenses_multipleRecords_returnsAllFieldsInDeterministicOrderWithoutRewrite
 )
-    
+
+add_test(
+    NAME ServerNetworkTests.newSession_startsUnauthenticated
+    COMMAND ServerNetworkTests newSession_startsUnauthenticated
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.authenticateRequest_validBoundLicense_returnsCorrelatedValidResponseAndAuthenticatesSession
+    COMMAND ServerRequestDispatcherTest authenticateRequest_validBoundLicense_returnsCorrelatedValidResponseAndAuthenticatesSession
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.authenticateRequest_unknownProductKey_returnsInvalidKeyWithoutAuthenticatingSession
+    COMMAND ServerRequestDispatcherTest authenticateRequest_unknownProductKey_returnsInvalidKeyWithoutAuthenticatingSession
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.authenticateRequest_malformedPayload_returnsCorrelatedInvalidRequestWithoutAuthenticatingSession
+    COMMAND ServerRequestDispatcherTest authenticateRequest_malformedPayload_returnsCorrelatedInvalidRequestWithoutAuthenticatingSession
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.fileChunk_beforeAuthentication_returnsCorrelatedAuthenticationFailedAndKeepsSessionLocked
+    COMMAND ServerRequestDispatcherTest fileChunk_beforeAuthentication_returnsCorrelatedAuthenticationFailedAndKeepsSessionLocked
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.reconnect_afterAuthenticatedSession_startsLockedAndRequiresAuthenticationAgain
+    COMMAND ServerRequestDispatcherTest reconnect_afterAuthenticatedSession_startsLockedAndRequiresAuthenticationAgain
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.authenticateRequest_disabledLicense_returnsDisabledBeforeDeviceCheckWithoutAuthenticatingSession
+    COMMAND ServerRequestDispatcherTest authenticateRequest_disabledLicense_returnsDisabledBeforeDeviceCheckWithoutAuthenticatingSession
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.authenticateRequest_boundLicenseWithDifferentDevice_returnsDeviceMismatchWithoutAuthenticatingSession
+    COMMAND ServerRequestDispatcherTest authenticateRequest_boundLicenseWithDifferentDevice_returnsDeviceMismatchWithoutAuthenticatingSession
+)
+
+add_test(NAME ServerRequestDispatcherTest.authenticateRequest_unboundLicense_bindsDeviceReturnsValidAndAuthenticatesSession
+    COMMAND ServerRequestDispatcherTest authenticateRequest_unboundLicense_bindsDeviceReturnsValidAndAuthenticatesSession
+)
