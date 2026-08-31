@@ -5,6 +5,11 @@
 #include <QFileInfo>
 #include <QObject>
 
+using MiniCloud::Server::LicenseRecord;
+using MiniCloud::Server::LicenseRepository;
+using MiniCloud::Server::LicenseRepositoryResult;
+using MiniCloud::Server::LicenseRepositoryStatus;
+
 class LicenseRepositoryTest : public QObject
 {
     Q_OBJECT
@@ -474,20 +479,30 @@ private slots:
         QCOMPARE(loadResult.status, LicenseRepositoryStatus::Success);
         QCOMPARE(repository.count(), qsizetype(0));
 
-        const LicenseRecord record = LicenseRecord{
+        const LicenseRecord originalRecord = LicenseRecord{
             QStringLiteral("MCLD-1234-5678"),
             QString(),
             false};
 
-        const auto insertResult1 = repository.insert(record);
+        const auto insertResult1 = repository.insert(originalRecord);
         QCOMPARE(insertResult1.status, LicenseRepositoryStatus::Success);
         QCOMPARE(repository.count(), qsizetype(1));
         QCOMPARE(QFileInfo::exists(filePath), true);
 
-        const auto insertResult2 = repository.insert(record);
+        const LicenseRecord duplicateRecord = LicenseRecord{
+            QStringLiteral("MCLD-1234-5678"),
+            QStringLiteral("DEVICE-OTHER"),
+            true};
+
+        const auto insertResult2 = repository.insert(duplicateRecord);
         QCOMPARE(insertResult2.status, LicenseRepositoryStatus::Failed);
         QVERIFY(!insertResult2.errorMessage.isEmpty());
         QCOMPARE(repository.count(), qsizetype(1));
+
+        const auto currentRecord = repository.findByProductKey(QStringLiteral("MCLD-1234-5678"));
+        QVERIFY(currentRecord.has_value());
+        QCOMPARE(currentRecord->deviceId, QString());
+        QCOMPARE(currentRecord->enabled, false);
 
         LicenseRepository reloadedRepository(filePath);
         const auto reloadResult = reloadedRepository.load();
@@ -497,6 +512,8 @@ private slots:
 
         const auto savedRecord = reloadedRepository.findByProductKey(QStringLiteral("MCLD-1234-5678"));
         QVERIFY(savedRecord.has_value());
+        QCOMPARE(savedRecord->deviceId, QString());
+        QCOMPARE(savedRecord->enabled, false);
     }
 
     void insert_emptyProductKey_failsWithoutCreatingFile()
@@ -865,7 +882,7 @@ private slots:
         QVERIFY(currentRecord.has_value());
         QCOMPARE(currentRecord->deviceId, QString());
         QCOMPARE(currentRecord->enabled, true);
-
+        
         LicenseRepository reloadedRepository(movedFilePath);
         const LicenseRepositoryResult reloadResult = reloadedRepository.load();
 
@@ -880,6 +897,7 @@ private slots:
         QCOMPARE(reloadedRecord->deviceId, QString());
         QCOMPARE(reloadedRecord->enabled, true);
     }
+
 };
 
 QTEST_MAIN(LicenseRepositoryTest)

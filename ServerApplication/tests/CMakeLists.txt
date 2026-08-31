@@ -171,6 +171,16 @@ add_test(
 )
 
 add_test(
+    NAME LicenseManagerTest.createLicense_afterInitialization_generatesCanonicalProductKeyFormat
+    COMMAND LicenseManagerTest createLicense_afterInitialization_generatesCanonicalProductKeyFormat
+)
+
+add_test(
+    NAME LicenseManagerTest.createLicense_generatedKeyCollision_retriesAndPreservesLeadingZeroes
+    COMMAND LicenseManagerTest createLicense_generatedKeyCollision_retriesAndPreservesLeadingZeroes
+)
+
+add_test(
     NAME LicenseManagerTest.createLicense_twice_generatesDistinctPersistedKeys
     COMMAND LicenseManagerTest createLicense_twice_generatesDistinctPersistedKeys
 )
@@ -178,4 +188,59 @@ add_test(
 add_test(
     NAME LicenseManagerTest.createLicense_persistenceFails_returnsFailureWithoutProductKey
     COMMAND LicenseManagerTest createLicense_persistenceFails_returnsFailureWithoutProductKey
+)
+
+add_test(
+    NAME LicenseManagerTest.disableLicense_existingEnabledLicense_persistsDisabledState
+    COMMAND LicenseManagerTest disableLicense_existingEnabledLicense_persistsDisabledState
+)
+
+add_test(
+    NAME LicenseManagerTest.disableLicense_beforeInitialization_fails
+    COMMAND LicenseManagerTest disableLicense_beforeInitialization_fails
+)
+
+add_test(
+    NAME LicenseManagerTest.disableLicense_blankProductKey_fails
+    COMMAND LicenseManagerTest disableLicense_blankProductKey_fails
+)
+
+add_test(
+    NAME LicenseManagerTest.disableLicense_unknownProductKey_failsWithoutMutation
+    COMMAND LicenseManagerTest disableLicense_unknownProductKey_failsWithoutMutation
+)
+
+add_test(
+    NAME LicenseManagerTest.disableLicense_alreadyDisabledLicense_succeedsWithoutRewrite
+    COMMAND LicenseManagerTest disableLicense_alreadyDisabledLicense_succeedsWithoutRewrite
+)
+
+add_test(
+    NAME LicenseManagerTest.disableLicense_persistenceFails_returnsFailureWithoutChangingState
+    COMMAND LicenseManagerTest disableLicense_persistenceFails_returnsFailureWithoutChangingState
+)
+
+add_test(
+    NAME LicenseManagerTest.enableLicense_existingDisabledLicense_persistsEnabledState
+    COMMAND LicenseManagerTest enableLicense_existingDisabledLicense_persistsEnabledState
+)
+
+add_test(
+    NAME LicenseManagerTest.enableLicense_alreadyEnabledLicense_succeedsWithoutRewrite
+    COMMAND LicenseManagerTest enableLicense_alreadyEnabledLicense_succeedsWithoutRewrite
+)
+
+add_test(
+    NAME LicenseManagerTest.enableLicense_persistenceFails_returnsFailureWithoutChangingState
+    COMMAND LicenseManagerTest enableLicense_persistenceFails_returnsFailureWithoutChangingState
+)
+
+add_test(
+    NAME LicenseManagerTest.authenticate_afterDisableAndReEnable_reflectsCurrentLicenseState
+    COMMAND LicenseManagerTest authenticate_afterDisableAndReEnable_reflectsCurrentLicenseState
+)
+
+add_test(
+    NAME LicenseManagerTest.authenticate_disabledLicense_returnsDisabledBeforeDeviceCheck
+    COMMAND LicenseManagerTest authenticate_disabledLicense_returnsDisabledBeforeDeviceCheck
 )
