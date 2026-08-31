@@ -5,6 +5,7 @@
 #include "licenserepository.h"
 #include "authentication.h"
 
+
 namespace MiniCloud::Server
 {
     enum class LicenseManagerOperationStatus
@@ -34,6 +35,22 @@ namespace MiniCloud::Server
         QString errorMessage;
     };
 
+    struct LicenseView
+    {
+        QString productKey;
+        QString deviceId;
+        bool enabled{false};
+    };
+
+    struct LicenseListResult
+    {
+        LicenseManagerOperationStatus status{
+            LicenseManagerOperationStatus::Failed};
+
+        QList<LicenseView> licenses;
+        QString errorMessage;
+    };
+
     class LicenseManager
     {
     public:
@@ -53,7 +70,7 @@ namespace MiniCloud::Server
 
         LicenseManagerResult disableLicense(const QString &productKey);
         LicenseManagerResult enableLicense(const QString &productKey);
-
+        LicenseListResult listLicenses() const;
 
     private:
         LicenseRepository m_repository;
@@ -61,6 +78,6 @@ namespace MiniCloud::Server
         bool m_initialized{false};
         QString generateCandidateProductKey() const;
 
-        LicenseManagerResult setLicenseEnabled(const QString &productKey,bool enabled);
+        LicenseManagerResult setLicenseEnabled(const QString &productKey, bool enabled);
     };
 }

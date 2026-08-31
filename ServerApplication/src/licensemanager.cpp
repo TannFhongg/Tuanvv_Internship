@@ -7,8 +7,7 @@ namespace MiniCloud::Server
     LicenseManager::LicenseManager(
         QString repositoryFilePath,
         LicenseManager::EntropySource entropySource)
-        : m_repository(std::move(repositoryFilePath))
-        , m_entropySource(std::move(entropySource))
+        : m_repository(std::move(repositoryFilePath)), m_entropySource(std::move(entropySource))
     {
     }
 
@@ -152,8 +151,8 @@ namespace MiniCloud::Server
     QString LicenseManager::generateCandidateProductKey() const
     {
         const quint64 randomValue = m_entropySource
-            ? m_entropySource()
-            : QRandomGenerator::system()->generate64();
+                                        ? m_entropySource()
+                                        : QRandomGenerator::system()->generate64();
 
         const QString hex = QStringLiteral("%1").arg(randomValue, 16, 16, QLatin1Char('0')).toUpper();
         return QStringLiteral("MCLD-%1-%2-%3-%4")
@@ -243,6 +242,31 @@ namespace MiniCloud::Server
         {
             result.errorMessage = updateResult.errorMessage;
             return result;
+        }
+
+        result.status = LicenseManagerOperationStatus::Success;
+        return result;
+    }
+
+    LicenseListResult LicenseManager::listLicenses() const
+    {
+        LicenseListResult result;
+
+        if (!m_initialized)
+        {
+            result.errorMessage = "LicenseManager is not initialized.";
+            return result;
+        }
+
+        const QList<LicenseRecord> records = m_repository.getAllRecords();
+        for (const auto &record : records)
+        {
+            LicenseView view{
+                record.productKey,
+                record.deviceId,
+                record.enabled};
+
+            result.licenses.append(view);
         }
 
         result.status = LicenseManagerOperationStatus::Success;
