@@ -5,6 +5,7 @@
 #include "protocolconstants.h"
 #include "protocolcodec.h"
 #include "frameparser.h"
+#include "authentication.h"
 
 class TcpServerTest : public QObject
 {
@@ -723,6 +724,59 @@ private slots:
         ClientSession session(socket);
 
         QVERIFY(!session.isAuthenticated());
+    }
+
+    void acceptedClientFrame_isForwardedByTcpServerWithSessionIdentity()
+    {
+        TcpServer server;
+        QVERIFY(server.startListening(QHostAddress::LocalHost, 0));
+
+        ClientSession *forwardedSession = nullptr;
+        MiniCloud::Protocol::ProtocolFrame forwardedFrame;
+        int forwardedCount = 0;
+
+        connect(
+            &server,
+            &TcpServer::frameReceived,
+            &server,
+            [&](ClientSession *session, const MiniCloud::Protocol::ProtocolFrame &frame)
+            {
+                forwardedSession = session;
+                forwardedFrame = frame;
+                ++forwardedCount;
+            });
+
+        QTcpSocket clientSocket;
+        clientSocket.connectToHost(QHostAddress::LocalHost, server.serverPort());
+        QTRY_COMPARE(clientSocket.state(), QAbstractSocket::ConnectedState);
+
+        const MiniCloud::Protocol::AuthenticateRequestData requestData{
+            QStringLiteral("MCLD-1111-2222-3333-4444"),
+            QStringLiteral("DEVICE-CLIENT")};
+
+        const MiniCloud::Protocol::AuthenticationEncodeResult requestPayload = MiniCloud::Protocol::serializeAuthenticateRequest(requestData);
+        QCOMPARE(requestPayload.status, MiniCloud::Protocol::AuthenticationEncodeResult::Status::Success);
+
+        constexpr MiniCloud::Protocol::RequestId requestId = 51;
+        constexpr MiniCloud::Protocol::TaskId taskId = 0;
+        const MiniCloud::Protocol::FrameEncodeResult encodedFrame =
+            MiniCloud::Protocol::serializeFrame(
+                MiniCloud::Protocol::MessageType::AuthenticateRequest,
+                requestId,
+                taskId,
+                requestPayload.payload);
+                
+        QCOMPARE(encodedFrame.status, MiniCloud::Protocol::FrameEncodeStatus::Success);
+
+        QCOMPARE(clientSocket.write(encodedFrame.encodedFrame), static_cast<qint64>(encodedFrame.encodedFrame.size()));
+        QVERIFY(clientSocket.waitForBytesWritten());
+        QTRY_COMPARE(forwardedCount, 1);
+
+        QVERIFY(forwardedSession != nullptr);
+        QCOMPARE(forwardedFrame.header.messageType, MiniCloud::Protocol::MessageType::AuthenticateRequest);
+        QCOMPARE(forwardedFrame.header.requestId, requestId);
+        QCOMPARE(forwardedFrame.header.taskId, taskId);
+        QCOMPARE(forwardedFrame.payload, requestPayload.payload);
     }
 };
 

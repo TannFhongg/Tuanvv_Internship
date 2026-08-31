@@ -127,6 +127,11 @@ add_test(
 )
 
 add_test(
+    NAME ServerNetworkTests.acceptedClientFrame_isForwardedByTcpServerWithSessionIdentity
+    COMMAND ServerNetworkTests acceptedClientFrame_isForwardedByTcpServerWithSessionIdentity
+)
+
+add_test(
     NAME LicenseManagerTest.initialize_missingRepository_succeeds
     COMMAND LicenseManagerTest initialize_missingRepository_succeeds
 )
