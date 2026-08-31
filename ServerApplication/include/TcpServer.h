@@ -2,6 +2,7 @@
 #include <QTcpServer>
 #include <QObject>
 #include <QHostAddress>
+#include "protocolframe.h"
 
 class ClientSession;
 
@@ -21,6 +22,9 @@ signals:
     void clientDisconnected();
     void clientRejected();
     void listenFailed(const QString &errorString);
+    void frameReceived(
+        ClientSession *session,
+        const MiniCloud::Protocol::ProtocolFrame &frame);
 
 private slots:
     void onNewConnection();

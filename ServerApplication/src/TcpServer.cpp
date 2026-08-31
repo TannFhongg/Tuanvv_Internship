@@ -73,6 +73,7 @@ void TcpServer::onNewConnection()
 
     m_activeSession = new ClientSession(socket, this);
     connect(m_activeSession, &ClientSession::sessionFinished, this, &TcpServer::onSessionFinished);
+    connect(m_activeSession, &ClientSession::frameReceived, this, &TcpServer::frameReceived);
     emit clientConnected();
 }
 void TcpServer::onSessionFinished(ClientSession *session)
