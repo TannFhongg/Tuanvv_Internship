@@ -1,39 +1,48 @@
 #pragma once
-#include <QString>
-#include <QHash>
+
 #include <optional>
+
+#include <QHash>
+#include <QList>
+#include <QString>
+
 #include "licenserecord.h"
 
-using MiniCloud::Server::LicenseRecord;
-
-enum class LicenseRepositoryStatus
+namespace MiniCloud::Server
 {
-    Success,
-    Failed
-};
-struct LicenseRepositoryResult
-{
-    LicenseRepositoryStatus status{LicenseRepositoryStatus::Failed};
-    QString errorMessage;
-};
 
-class LicenseRepository
-{
-public:
-    explicit LicenseRepository(QString filePath);
+    enum class LicenseRepositoryStatus
+    {
+        Success,
+        Failed
+    };
 
-    LicenseRepositoryResult load();
+    struct LicenseRepositoryResult
+    {
+        LicenseRepositoryStatus status{LicenseRepositoryStatus::Failed};
+        QString errorMessage;
+    };
 
-    qsizetype count() const noexcept;
+    class LicenseRepository
+    {
+    public:
+        explicit LicenseRepository(QString filePath);
 
-    std::optional<LicenseRecord> findByProductKey(const QString &productKey) const;
+        LicenseRepositoryResult load();
 
-    LicenseRepositoryResult insert(const LicenseRecord &record);
-    LicenseRepositoryResult update(const LicenseRecord &record);
+        qsizetype count() const noexcept;
 
-private:
-    QString m_filePath;
-    QHash<QString, LicenseRecord> m_records;
+        std::optional<LicenseRecord> findByProductKey(const QString &productKey) const;
 
-    LicenseRepositoryResult saveRecords(const QHash<QString, LicenseRecord> &records) const;
-};
+        QList<LicenseRecord> getAllRecords() const;
+
+        LicenseRepositoryResult insert(const LicenseRecord &record);
+        LicenseRepositoryResult update(const LicenseRecord &record);
+
+    private:
+        QString m_filePath;
+        QHash<QString, LicenseRecord> m_records;
+
+        LicenseRepositoryResult saveRecords(const QHash<QString, LicenseRecord> &records) const;
+    };
+} 

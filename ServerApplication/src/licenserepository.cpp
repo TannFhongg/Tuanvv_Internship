@@ -1,3 +1,5 @@
+#include "licenserepository.h"
+
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -6,8 +8,12 @@
 #include <QJsonParseError>
 #include <QSaveFile>
 
+#include <algorithm>
 #include <cmath>
-#include "licenserepository.h"
+#include <utility>
+
+namespace MiniCloud::Server
+{
 
 LicenseRepository::LicenseRepository(QString filePath)
     : m_filePath(std::move(filePath))
@@ -27,14 +33,22 @@ LicenseRepositoryResult LicenseRepository::load()
     }
 
     QFile file(m_filePath);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    if (!file.open(QIODevice::ReadOnly))
     {
         result.errorMessage = QStringLiteral("Failed to open file for reading: %1").arg(m_filePath);
         return result;
     }
+
+    const QByteArray payload = file.readAll();
+    if (file.error() != QFileDevice::NoError)
+    {
+        result.errorMessage = QStringLiteral("Failed to read file: %1").arg(m_filePath);
+        return result;
+    }
+
     QJsonParseError parseError;
 
-    QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
     if (parseError.error != QJsonParseError::NoError)
     {
         result.errorMessage = QStringLiteral("Failed to parse JSON from file: %1").arg(m_filePath);
@@ -109,12 +123,6 @@ LicenseRepositoryResult LicenseRepository::load()
             return result;
         }
 
-        if (productKey.isEmpty())
-        {
-            result.errorMessage = QStringLiteral("Missing or invalid 'productKey' in file: %1").arg(m_filePath);
-            return result;
-        }
-
         tempRecords.insert(productKey, LicenseRecord{productKey, deviceIdValue.toString(), enabledValue.toBool()});
     }
 
@@ -141,8 +149,22 @@ std::optional<LicenseRecord> LicenseRepository::findByProductKey(const QString &
     return *iterator;
 }
 
-LicenseRepositoryResult LicenseRepository::insert(const LicenseRecord &record)
+QList<LicenseRecord> LicenseRepository::getAllRecords() const
+{
+    QList<LicenseRecord> records = m_records.values();
 
+    std::sort(
+        records.begin(),
+        records.end(),
+        [](const LicenseRecord &left, const LicenseRecord &right)
+        {
+            return left.productKey < right.productKey;
+        });
+
+    return records;
+}
+
+LicenseRepositoryResult LicenseRepository::insert(const LicenseRecord &record)
 {
     LicenseRepositoryResult result;
     if (record.productKey.isEmpty())
@@ -229,25 +251,23 @@ LicenseRepositoryResult LicenseRepository::saveRecords(const QHash<QString, Lice
 
     QSaveFile file(m_filePath);
 
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+    if (!file.open(QIODevice::WriteOnly))
     {
         result.errorMessage = QStringLiteral("Failed to open file for writing: %1").arg(m_filePath);
         return result;
     }
 
-    qint64 writtenBytes = file.write(payload);
+    const qint64 writtenBytes = file.write(payload);
 
-    if (writtenBytes != payload.size())
+    if (writtenBytes != static_cast<qint64>(payload.size()))
     {
         file.cancelWriting();
-        LicenseRepositoryResult result;
         result.errorMessage = QStringLiteral("Failed to write all data to file: %1").arg(m_filePath);
         return result;
     }
 
     if (!file.commit())
     {
-        LicenseRepositoryResult result;
         result.errorMessage = QStringLiteral("Failed to commit changes to file: %1").arg(m_filePath);
         return result;
     }
@@ -255,3 +275,5 @@ LicenseRepositoryResult LicenseRepository::saveRecords(const QHash<QString, Lice
     result.status = LicenseRepositoryStatus::Success;
     return result;
 }
+
+} 
