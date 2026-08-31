@@ -716,6 +716,14 @@ private slots:
         QCOMPARE(errorCode, MiniCloud::Protocol::ErrorCode::InvalidFrame);
         QVERIFY(!signalArguments.at(1).toString().isEmpty());
     }
+
+    void newSession_startsUnauthenticated()
+    {
+        auto *socket = new QTcpSocket();
+        ClientSession session(socket);
+
+        QVERIFY(!session.isAuthenticated());
+    }
 };
 
 QTEST_GUILESS_MAIN(TcpServerTest)
