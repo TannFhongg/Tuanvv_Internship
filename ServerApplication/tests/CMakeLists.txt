@@ -244,3 +244,19 @@ add_test(
     NAME LicenseManagerTest.authenticate_disabledLicense_returnsDisabledBeforeDeviceCheck
     COMMAND LicenseManagerTest authenticate_disabledLicense_returnsDisabledBeforeDeviceCheck
 )
+
+add_test(
+    NAME LicenseManagerTest.listLicenses_beforeInitialization_fails
+    COMMAND LicenseManagerTest listLicenses_beforeInitialization_fails
+)
+
+add_test(
+    NAME LicenseManagerTest.listLicenses_emptyRepository_returnsEmptyListWithoutMutation
+    COMMAND LicenseManagerTest listLicenses_emptyRepository_returnsEmptyListWithoutMutation
+)
+
+add_test(
+    NAME LicenseManagerTest.listLicenses_multipleRecords_returnsAllFieldsInDeterministicOrderWithoutRewrite
+    COMMAND LicenseManagerTest listLicenses_multipleRecords_returnsAllFieldsInDeterministicOrderWithoutRewrite
+)
+    
