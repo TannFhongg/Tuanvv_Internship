@@ -44,7 +44,7 @@ namespace MiniCloud::Protocol
         return data;
     }
 
-    HeaderDecodeResult deserializeHeader(const QByteArray &data)
+    HeaderDecodeResult MiniCloud::Protocol::deserializeHeader(const QByteArray &data)
     {
         if (data.size() < static_cast<qsizetype>(sizeof(quint32)))
 
