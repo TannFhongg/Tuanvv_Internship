@@ -6,6 +6,7 @@
 namespace MiniCloud::Protocol
 {
     QByteArray serializeHeader(const ProtocolHeader &header);
+    
     enum class HeaderDecodeStatus : quint16
     {
         Success,
@@ -17,7 +18,7 @@ namespace MiniCloud::Protocol
     {
         HeaderDecodeStatus status = HeaderDecodeStatus::Failed;
         ProtocolHeader header{};
-        ErrorCode errorCode = ErrorCode::None;
+        ErrorCode errorCode = ErrorCode::InvalidFrame;
     };
 
     enum class FrameEncodeStatus { 
@@ -33,7 +34,5 @@ namespace MiniCloud::Protocol
 
     FrameEncodeResult serializeFrame(MessageType messageType, RequestId requestId, TaskId taskId, const QByteArray &payload);
                 
-
-    
     HeaderDecodeResult deserializeHeader(const QByteArray &data);
 }
