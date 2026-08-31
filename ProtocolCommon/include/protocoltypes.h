@@ -3,7 +3,9 @@
 
 */
 #pragma once
-#include <QtGlobal> // để dùng quint64
+#include <QtGlobal> 
+#include <QMetaType>
+
 namespace MiniCloud::Protocol
 {
     using RequestId = quint64;
@@ -29,3 +31,5 @@ namespace MiniCloud::Protocol
         PayloadTooLarge = 8,
     };
 }
+
+Q_DECLARE_METATYPE(MiniCloud::Protocol::ErrorCode)
