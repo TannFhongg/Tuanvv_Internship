@@ -49,10 +49,7 @@ private slots:
         const QString licenseFilePath = temporaryDirectory.filePath(QStringLiteral("licenses.json"));
 
         LicenseRepository repository(licenseFilePath);
-        const LicenseRecord license{
-            QStringLiteral("MCLD-BOUND-0001"),
-            QStringLiteral("DEVICE-OWNER"),
-            true};
+        const LicenseRecord license{QStringLiteral("MCLD-BOUND-0001"), QStringLiteral("DEVICE-OWNER"), true};
 
         const LicenseRepositoryResult insertResult = repository.insert(license);
         QCOMPARE(insertResult.status, LicenseRepositoryStatus::Success);
@@ -137,9 +134,7 @@ private slots:
         ClientSession session(serverSocket);
         QVERIFY(!session.isAuthenticated());
 
-        const AuthenticateRequestData requestData{
-            QStringLiteral("MCLD-FFFF-FFFF-FFFF-FFFF"),
-            QStringLiteral("DEVICE-CLIENT")};
+        const AuthenticateRequestData requestData{QStringLiteral("MCLD-FFFF-FFFF-FFFF-FFFF"), QStringLiteral("DEVICE-CLIENT")};
 
         const AuthenticationEncodeResult requestPayload = MiniCloud::Protocol::serializeAuthenticateRequest(requestData);
         QCOMPARE(requestPayload.status, AuthenticationEncodeResult::Status::Success);
@@ -201,10 +196,7 @@ private slots:
         QVERIFY(!session.isAuthenticated());
 
         const QString productKey = QStringLiteral("MCLD-1111-2222-3333-4444");
-        const LicenseRecord disabledRecord{
-            productKey,
-            QStringLiteral("DEVICE-OWNER"),
-            false};
+        const LicenseRecord disabledRecord{productKey, QStringLiteral("DEVICE-OWNER"), false};
 
         LicenseRepository repository(licenseFilePath);
         const LicenseRepositoryResult insertResult = repository.insert(disabledRecord);
@@ -214,9 +206,7 @@ private slots:
         const LicenseManagerResult initializeResult = licenseManager.initialize();
         QCOMPARE(initializeResult.status, LicenseManagerOperationStatus::Success);
 
-        const AuthenticateRequestData requestData{
-            productKey,
-            QStringLiteral("DEVICE-INTRUDER")};
+        const AuthenticateRequestData requestData{productKey, QStringLiteral("DEVICE-INTRUDER")};
 
         const AuthenticationEncodeResult requestPayload = MiniCloud::Protocol::serializeAuthenticateRequest(requestData);
         QCOMPARE(requestPayload.status, AuthenticationEncodeResult::Status::Success);
@@ -279,10 +269,7 @@ private slots:
         QVERIFY(!session.isAuthenticated());
 
         const QString productKey = QStringLiteral("MCLD-1111-2222-3333-4444");
-        const LicenseRecord boundRecord{
-            productKey,
-            QStringLiteral("DEVICE-OWNER"),
-            true};
+        const LicenseRecord boundRecord{productKey, QStringLiteral("DEVICE-OWNER"), true};
 
         LicenseRepository repository(licenseFilePath);
         const LicenseRepositoryResult insertResult = repository.insert(boundRecord);
@@ -292,9 +279,7 @@ private slots:
         const LicenseManagerResult initializeResult = licenseManager.initialize();
         QCOMPARE(initializeResult.status, LicenseManagerOperationStatus::Success);
 
-        const AuthenticateRequestData requestData{
-            productKey,
-            QStringLiteral("DEVICE-INTRUDER")};
+        const AuthenticateRequestData requestData{productKey, QStringLiteral("DEVICE-INTRUDER")};
 
         const AuthenticationEncodeResult requestPayload = MiniCloud::Protocol::serializeAuthenticateRequest(requestData);
         QCOMPARE(requestPayload.status, AuthenticationEncodeResult::Status::Success);
@@ -366,10 +351,7 @@ private slots:
         QVERIFY(!session.isAuthenticated());
 
         const QString productKey = QStringLiteral("MCLD-1111-2222-3333-4444");
-        const LicenseRecord unboundRecord{
-            productKey,
-            QString(),
-            true};
+        const LicenseRecord unboundRecord{productKey, QString(), true};
 
         LicenseRepository repository(licenseFilePath);
         const LicenseRepositoryResult insertResult = repository.insert(unboundRecord);
@@ -380,9 +362,7 @@ private slots:
         QCOMPARE(initializeResult.status, LicenseManagerOperationStatus::Success);
 
         const QString deviceId = QStringLiteral("DEVICE-CLIENT");
-        const AuthenticateRequestData requestData{
-            productKey,
-            deviceId};
+        const AuthenticateRequestData requestData{productKey, deviceId};
 
         const AuthenticationEncodeResult requestPayload = MiniCloud::Protocol::serializeAuthenticateRequest(requestData);
         QCOMPARE(requestPayload.status, AuthenticationEncodeResult::Status::Success);
@@ -444,7 +424,6 @@ private slots:
         const QString movedStoragePath = temporaryDirectory.filePath(QStringLiteral("storage-moved"));
 
         const QString repositoryFilePath = QDir(storagePath).filePath(QStringLiteral("licenses.json"));
-
         const QString movedRepositoryFilePath = QDir(movedStoragePath).filePath(QStringLiteral("licenses.json"));
 
         QDir temporaryDirectoryPath(temporaryDirectory.path());
@@ -466,10 +445,7 @@ private slots:
         QVERIFY(!session.isAuthenticated());
 
         const QString productKey = QStringLiteral("MCLD-1111-2222-3333-4444");
-        const LicenseRecord unboundRecord{
-            productKey,
-            QString(),
-            true};
+        const LicenseRecord unboundRecord{productKey, QString(), true};
 
         LicenseRepository repository(repositoryFilePath);
         const LicenseRepositoryResult insertResult = repository.insert(unboundRecord);
@@ -484,9 +460,7 @@ private slots:
         QVERIFY(QFileInfo::exists(movedRepositoryFilePath));
 
         const QString deviceId = QStringLiteral("DEVICE-CLIENT");
-        const AuthenticateRequestData requestData{
-            productKey,
-            deviceId};
+        const AuthenticateRequestData requestData{productKey, deviceId};
 
         const AuthenticationEncodeResult requestPayload = MiniCloud::Protocol::serializeAuthenticateRequest(requestData);
         QCOMPARE(requestPayload.status, AuthenticationEncodeResult::Status::Success);
@@ -658,10 +632,7 @@ private slots:
 
         const QString repositoryFilePath = temporaryDirectory.filePath(QStringLiteral("licenses.json"));
 
-        const LicenseRecord license{
-            QStringLiteral("MCLD-BOUND-0001"),
-            QStringLiteral("DEVICE-OWNER"),
-            true};
+        const LicenseRecord license{QStringLiteral("MCLD-BOUND-0001"), QStringLiteral("DEVICE-OWNER"), true};
 
         LicenseRepository repository(repositoryFilePath);
         const LicenseRepositoryResult insertResult = repository.insert(license);
@@ -696,8 +667,7 @@ private slots:
         authenticationFrame.header.requestId = 49;
         authenticationFrame.header.taskId = 0;
         authenticationFrame.payload = authenticationPayload.payload;
-        authenticationFrame.header.payloadLength =
-            static_cast<quint32>(authenticationFrame.payload.size());
+        authenticationFrame.header.payloadLength = static_cast<quint32>(authenticationFrame.payload.size());
 
         dispatcher.handleFrame(sessionA, authenticationFrame);
 
