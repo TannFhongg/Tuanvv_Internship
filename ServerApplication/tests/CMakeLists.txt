@@ -37,6 +37,15 @@ target_link_libraries(ServerRequestDispatcherTest PRIVATE
     Qt6::Network
 )
 
+add_executable(ServerControllerTest
+    servercontrollertest.cpp
+)
+
+target_link_libraries(ServerControllerTest PRIVATE
+    ServerCore
+    Qt6::Test
+    Qt6::Network
+)
 
 add_test(
     NAME LicenseManagerTest
@@ -51,6 +60,11 @@ add_test(
 add_test(
     NAME ServerNetworkTests
     COMMAND ServerNetworkTests
+)
+
+add_test(
+    NAME ServerControllerTest
+    COMMAND ServerControllerTest
 )
 
 add_test(
@@ -129,6 +143,11 @@ add_test(
 add_test(
     NAME ServerNetworkTests.acceptedClientFrame_isForwardedByTcpServerWithSessionIdentity
     COMMAND ServerNetworkTests acceptedClientFrame_isForwardedByTcpServerWithSessionIdentity
+)
+
+add_test(
+    NAME ServerControllerTest.validAuthentication_overTcp_returnsCorrelatedValidResponse
+    COMMAND ServerControllerTest validAuthentication_overTcp_returnsCorrelatedValidResponse
 )
 
 add_test(
@@ -318,4 +337,15 @@ add_test(
 
 add_test(NAME ServerRequestDispatcherTest.authenticateRequest_unboundLicense_bindsDeviceReturnsValidAndAuthenticatesSession
     COMMAND ServerRequestDispatcherTest authenticateRequest_unboundLicense_bindsDeviceReturnsValidAndAuthenticatesSession
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest
+    COMMAND ServerRequestDispatcherTest
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.authenticateRequest_unboundLicensePersistenceFails_returnsCorrelatedInternalServerErrorWithoutAuthenticatingSession
+    COMMAND ServerRequestDispatcherTest
+    authenticateRequest_unboundLicensePersistenceFails_returnsCorrelatedInternalServerErrorWithoutAuthenticatingSession
 )
