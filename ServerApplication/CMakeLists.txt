@@ -21,6 +21,7 @@ add_library(ServerCore STATIC
     src/licenserepository.cpp
     src/licensemanager.cpp
     src/ServerRequestDispatcher.cpp
+    src/servercontroller.cpp
 
     include/licensemanager.h
     include/TcpServer.h
@@ -28,6 +29,7 @@ add_library(ServerCore STATIC
     include/licenserepository.h
     include/licenserecord.h
     include/ServerRequestDispatcher.h
+    include/servercontroller.h
 )
 target_include_directories(ServerCore
     PUBLIC
