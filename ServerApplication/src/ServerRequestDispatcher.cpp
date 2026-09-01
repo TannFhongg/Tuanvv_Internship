@@ -5,23 +5,20 @@
 #include "errorresponse.h"
 #include "licensemanager.h"
 
-ServerRequestDispatcher::ServerRequestDispatcher(
-    MiniCloud::Server::LicenseManager &licenseManager)
+ServerRequestDispatcher::ServerRequestDispatcher(MiniCloud::Server::LicenseManager &licenseManager)
     : m_licenseManager(licenseManager) {}
 
 void ServerRequestDispatcher::handleFrame(ClientSession &session, const MiniCloud::Protocol::ProtocolFrame &frame)
 {
-    if (frame.header.messageType == MiniCloud::Protocol::MessageType::FileChunk
-        && !session.isAuthenticated())
+    if (frame.header.messageType == MiniCloud::Protocol::MessageType::FileChunk && !session.isAuthenticated())
     {
         const MiniCloud::Protocol::ErrorResponseData errorData{
             MiniCloud::Protocol::ErrorCode::AuthenticationFailed,
             QStringLiteral("Authentication is required to access file content.")};
-        const MiniCloud::Protocol::ErrorResponseEncodeResult errorResponse =
-            MiniCloud::Protocol::serializeErrorResponse(errorData);
 
-        if (errorResponse.status
-            == MiniCloud::Protocol::ErrorResponseEncodeResult::Status::Success)
+        const MiniCloud::Protocol::ErrorResponseEncodeResult errorResponse = MiniCloud::Protocol::serializeErrorResponse(errorData);
+
+        if (errorResponse.status == MiniCloud::Protocol::ErrorResponseEncodeResult::Status::Success)
         {
             session.sendFrame(
                 MiniCloud::Protocol::MessageType::ErrorResponse,
