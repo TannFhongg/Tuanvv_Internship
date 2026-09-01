@@ -30,6 +30,7 @@ public:
     bool isFeatureAccessAllowed() const noexcept;
 
     bool connectToServer(const QString &hostname, quint16 port);
+    void disconnectFromServer();
     bool isConnected() const;
 
     MiniCloud::Client::RequestSendResult activate(const QString &licenseKey, const QString &deviceId);
@@ -39,6 +40,7 @@ signals:
     void activationRejected(MiniCloud::Protocol::AuthenticationStatus status);
     void activationError(const MiniCloud::Protocol::ErrorResponseData &error);
     void activationFailed(MiniCloud::Client::RequestDispatchError error);
+    void connectionStateChanged(bool connected);
 
 private slots:
     void onResponseReceived(MiniCloud::Client::RequestDestination destination, const MiniCloud::Protocol::ProtocolFrame &frame);

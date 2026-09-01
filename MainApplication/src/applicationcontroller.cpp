@@ -32,6 +32,15 @@ ApplicationController::ApplicationController(int requestTimeoutMs, QObject *pare
         &NetworkClient::disconnected,
         this,
         &ApplicationController::onDisconnected);
+        
+    connect(
+        &m_networkClient,
+        &NetworkClient::connected,
+        this,
+        [this]()
+        {
+            emit connectionStateChanged(true);
+        });
 }
 
 MiniCloud::Client::ClientAccessState ApplicationController::accessState() const noexcept
@@ -47,6 +56,11 @@ bool ApplicationController::isFeatureAccessAllowed() const noexcept
 bool ApplicationController::connectToServer(const QString &hostname, quint16 port)
 {
     return m_networkClient.connectToServer(hostname, port);
+}
+
+void ApplicationController::disconnectFromServer()
+{
+    m_networkClient.disconnectFromServer();
 }
 
 bool ApplicationController::isConnected() const
@@ -172,6 +186,7 @@ void ApplicationController::onRequestFailed(
 void ApplicationController::onDisconnected()
 {
     setAccessState(MiniCloud::Client::ClientAccessState::Locked);
+    emit connectionStateChanged(false);
 }
 
 void ApplicationController::setAccessState(MiniCloud::Client::ClientAccessState state)
