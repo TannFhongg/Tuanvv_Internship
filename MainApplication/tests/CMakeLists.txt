@@ -240,3 +240,7 @@ add_test(
     NAME ApplicationControllerTest.reconnect_afterActivation_requiresAndAcceptsNewAuthentication
     COMMAND ApplicationControllerTest reconnect_afterActivation_requiresAndAcceptsNewAuthentication)
 
+add_test(
+    NAME ApplicationControllerTest.connectionLifecycle_connectThenDisconnect_reportsStateAndKeepsFeaturesLocked
+    COMMAND ApplicationControllerTest connectionLifecycle_connectThenDisconnect_reportsStateAndKeepsFeaturesLocked)
+

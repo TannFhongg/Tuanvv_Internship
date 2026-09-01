@@ -731,6 +731,39 @@ private slots:
         QVERIFY(controller.isFeatureAccessAllowed());
         QVERIFY(controller.isConnected());
     }
+
+    void connectionLifecycle_connectThenDisconnect_reportsStateAndKeepsFeaturesLocked()
+    {
+        QTcpServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost, 0));
+
+        ApplicationController controller;
+        QSignalSpy connectionSpy(&controller, &ApplicationController::connectionStateChanged);
+        QVERIFY(connectionSpy.isValid());
+        QVERIFY(!controller.isConnected());
+
+        QVERIFY(controller.connectToServer(QStringLiteral("127.0.0.1"), server.serverPort()));
+        QTRY_VERIFY(controller.isConnected());
+        QTRY_VERIFY(server.hasPendingConnections());
+        QTRY_COMPARE(connectionSpy.count(), 1);
+
+        QCOMPARE(connectionSpy.at(0).at(0).toBool(), true);
+        QCOMPARE(controller.accessState(), ClientAccessState::Locked);
+        QVERIFY(!controller.isFeatureAccessAllowed());
+
+        QTcpSocket *serverSocket = server.nextPendingConnection();
+        QVERIFY(serverSocket != nullptr);
+
+        controller.disconnectFromServer();
+
+        QTRY_VERIFY(!controller.isConnected());
+        QTRY_COMPARE(serverSocket->state(), QAbstractSocket::UnconnectedState);
+        QTRY_COMPARE(connectionSpy.count(), 2);
+        QCOMPARE(connectionSpy.at(1).at(0).toBool(), false);
+
+        QCOMPARE(controller.accessState(), ClientAccessState::Locked);
+        QVERIFY(!controller.isFeatureAccessAllowed());
+    }
 };
 
 QTEST_GUILESS_MAIN(ApplicationControllerTest)
