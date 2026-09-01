@@ -18,6 +18,16 @@ target_link_libraries(RequestDispatcherTests
     MainCore
 )
 
+add_executable(ApplicationControllerTest
+    applicationcontrollertest.cpp
+)
+
+target_link_libraries(ApplicationControllerTest
+    PRIVATE
+    Qt6::Test
+    MainCore
+)
+
 add_test(
     NAME ClientNetworkTests
     COMMAND ClientNetworkTests)
@@ -111,6 +121,14 @@ add_test(
     COMMAND RequestDispatcherTests)
 
 add_test(
+    NAME ApplicationControllerTest
+    COMMAND ApplicationControllerTest)
+
+add_test(
+    NAME ApplicationControllerTest.initialState_isLockedAndFeatureAccessDenied
+    COMMAND ApplicationControllerTest initialState_isLockedAndFeatureAccessDenied)
+
+add_test(
     NAME RequestDispatcherTests.sendRequest_invalidMessageType_returnsFailedWithoutPending
     COMMAND RequestDispatcherTests sendRequest_invalidMessageType_returnsFailedWithoutPending)
 
@@ -169,3 +187,56 @@ add_test(
 add_test(
     NAME RequestDispatcherTests.responses_outOfOrder_areCorrelatedByRequestId
     COMMAND RequestDispatcherTests responses_outOfOrder_areCorrelatedByRequestId)
+
+add_test(
+    NAME ApplicationControllerTest.activate_whenDisconnected_returnsNotConnectedAndRemainsLocked
+    COMMAND ApplicationControllerTest activate_whenDisconnected_returnsNotConnectedAndRemainsLocked)
+
+add_test(
+    NAME ApplicationControllerTest.activate_whenConnected_sendsAuthenticateRequestAndEntersAuthenticating
+    COMMAND ApplicationControllerTest activate_whenConnected_sendsAuthenticateRequestAndEntersAuthenticating)
+
+add_test(
+    NAME ApplicationControllerTest.authenticateResponse_valid_transitionsToActiveAndAllowsFeatureAccess
+    COMMAND ApplicationControllerTest authenticateResponse_valid_transitionsToActiveAndAllowsFeatureAccess)
+
+add_test(
+    NAME ApplicationControllerTest.authenticateResponse_nonValidStatus_returnsLockedAndDeniesFeatureAccess
+    COMMAND ApplicationControllerTest authenticateResponse_nonValidStatus_returnsLockedAndDeniesFeatureAccess)
+
+add_test(
+    NAME ApplicationControllerTest.errorResponse_duringAuthentication_returnsLockedAndReportsRemoteError
+    COMMAND ApplicationControllerTest errorResponse_duringAuthentication_returnsLockedAndReportsRemoteError)
+
+add_test(
+    NAME ApplicationControllerTest.authenticateResponse_malformedPayload_returnsLockedAndReportsInvalidResponsePayload
+    COMMAND ApplicationControllerTest authenticateResponse_malformedPayload_returnsLockedAndReportsInvalidResponsePayload)
+
+add_test(
+    NAME ApplicationControllerTest.serverDisconnect_afterActivation_returnsLockedAndDeniesFeatureAccess
+    COMMAND ApplicationControllerTest serverDisconnect_afterActivation_returnsLockedAndDeniesFeatureAccess)
+
+add_test(
+    NAME ApplicationControllerTest.authenticationRequest_whenDeadlineExpires_returnsLockedAndReportsRequestTimeout
+    COMMAND ApplicationControllerTest authenticationRequest_whenDeadlineExpires_returnsLockedAndReportsRequestTimeout)
+
+add_test(
+    NAME ApplicationControllerTest.activate_afterInvalidKey_canRetryAndBecomeActiveWithoutReconnect
+    COMMAND ApplicationControllerTest activate_afterInvalidKey_canRetryAndBecomeActiveWithoutReconnect)
+
+add_test(
+    NAME ApplicationControllerTest.activate_whileAuthenticationPending_returnsInvalidRequestWithoutSendingSecondFrame
+    COMMAND ApplicationControllerTest activate_whileAuthenticationPending_returnsInvalidRequestWithoutSendingSecondFrame)
+
+add_test(
+    NAME ApplicationControllerTest.activate_blankRequiredField_returnsInvalidRequestWithoutSendingFrame
+    COMMAND ApplicationControllerTest activate_blankRequiredField_returnsInvalidRequestWithoutSendingFrame)
+
+add_test(
+    NAME ApplicationControllerTest.serverDisconnect_whileAuthenticating_returnsLockedAndReportsConnectionLostOnce
+    COMMAND ApplicationControllerTest serverDisconnect_whileAuthenticating_returnsLockedAndReportsConnectionLostOnce)
+
+add_test(
+    NAME ApplicationControllerTest.reconnect_afterActivation_requiresAndAcceptsNewAuthentication
+    COMMAND ApplicationControllerTest reconnect_afterActivation_requiresAndAcceptsNewAuthentication)
+
