@@ -18,9 +18,11 @@ set_target_properties(MainApplication PROPERTIES
 add_library(MainCore STATIC
     src/NetworkClient.cpp
     src/requestdispatcher.cpp
+    src/applicationcontroller.cpp
     include/NetworkClient.h
     include/requestdispatcher.h
     include/requesttypes.h
+    include/applicationcontroller.h
 )
 
 target_include_directories(MainCore
