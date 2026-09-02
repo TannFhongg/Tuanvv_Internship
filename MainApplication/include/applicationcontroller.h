@@ -41,6 +41,7 @@ signals:
     void activationError(const MiniCloud::Protocol::ErrorResponseData &error);
     void activationFailed(MiniCloud::Client::RequestDispatchError error);
     void connectionStateChanged(bool connected);
+    void connectionFailed(const QString &message);
 
 private slots:
     void onResponseReceived(MiniCloud::Client::RequestDestination destination, const MiniCloud::Protocol::ProtocolFrame &frame);

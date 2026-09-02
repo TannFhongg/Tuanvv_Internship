@@ -41,6 +41,16 @@ ApplicationController::ApplicationController(int requestTimeoutMs, QObject *pare
         {
             emit connectionStateChanged(true);
         });
+
+    connect(
+        &m_networkClient,
+        &NetworkClient::connectionError,
+        this,
+        [this](QAbstractSocket::SocketError, const QString &message)
+        {
+            setAccessState(MiniCloud::Client::ClientAccessState::Locked);
+            emit connectionFailed(message);
+        });
 }
 
 MiniCloud::Client::ClientAccessState ApplicationController::accessState() const noexcept
