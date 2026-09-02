@@ -28,6 +28,30 @@ target_link_libraries(ApplicationControllerTest
     MainCore
 )
 
+add_executable(MainWindowTest
+    mainwindowtest.cpp
+    ../src/mainwindow.cpp
+    ../include/mainwindow.h
+    ../Forms/mainwindow.ui
+)
+
+target_include_directories(MainWindowTest
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
+set_target_properties(MainWindowTest PROPERTIES
+    AUTOUIC_SEARCH_PATHS
+    "${CMAKE_CURRENT_SOURCE_DIR}/../Forms"
+)
+
+target_link_libraries(MainWindowTest
+    PRIVATE
+    Qt6::Test
+    Qt6::Widgets
+    MainCore
+)
+
 add_test(
     NAME ClientNetworkTests
     COMMAND ClientNetworkTests)
@@ -123,6 +147,62 @@ add_test(
 add_test(
     NAME ApplicationControllerTest
     COMMAND ApplicationControllerTest)
+
+add_test(
+    NAME MainWindowTest
+    COMMAND MainWindowTest)
+
+add_test(
+    NAME MainWindowTest.initialState_showsActivationPageAndDisablesFileFeatures
+    COMMAND MainWindowTest initialState_showsActivationPageAndDisablesFileFeatures)
+
+add_test(
+    NAME MainWindowTest.connectButton_validEndpoint_connectsAndEnablesActivationControls
+    COMMAND MainWindowTest connectButton_validEndpoint_connectsAndEnablesActivationControls)
+
+add_test(
+    NAME MainWindowTest.disconnectButton_whenConnected_disconnectsAndRestoresLockedUi
+    COMMAND MainWindowTest disconnectButton_whenConnected_disconnectsAndRestoresLockedUi)
+
+add_test(
+    NAME MainWindowTest.activateButton_validCredentials_sendsAuthenticationAndShowsPendingState
+    COMMAND MainWindowTest activateButton_validCredentials_sendsAuthenticationAndShowsPendingState)
+
+add_test(
+    NAME MainWindowTest.authenticateResponse_valid_opensFileFeaturesAndKeepsSessionConnected
+    COMMAND MainWindowTest authenticateResponse_valid_opensFileFeaturesAndKeepsSessionConnected)
+
+add_test(
+    NAME MainWindowTest.authenticateResponse_nonValidStatus_staysLockedShowsErrorAndAllowsRetry
+    COMMAND MainWindowTest authenticateResponse_nonValidStatus_staysLockedShowsErrorAndAllowsRetry)
+
+add_test(
+    NAME MainWindowTest.errorResponse_duringAuthentication_showsRemoteErrorAndAllowsRetry
+    COMMAND MainWindowTest errorResponse_duringAuthentication_showsRemoteErrorAndAllowsRetry)
+
+add_test(
+    NAME MainWindowTest.authenticateResponse_malformedPayload_showsInvalidResponseErrorAndAllowsRetry
+    COMMAND MainWindowTest authenticateResponse_malformedPayload_showsInvalidResponseErrorAndAllowsRetry)
+
+add_test(
+    NAME MainWindowTest.authenticationRequest_whenDeadlineExpires_showsTimeoutAndAllowsRetry
+    COMMAND MainWindowTest authenticationRequest_whenDeadlineExpires_showsTimeoutAndAllowsRetry)
+
+add_test(
+    NAME MainWindowTest.disconnectButton_afterActivation_closesFileFeaturesAndReturnsToActivationPage
+    COMMAND MainWindowTest disconnectButton_afterActivation_closesFileFeaturesAndReturnsToActivationPage)
+
+add_test(
+    NAME MainWindowTest.activateButton_blankRequiredField_showsValidationErrorWithoutSendingFrame
+    COMMAND MainWindowTest activateButton_blankRequiredField_showsValidationErrorWithoutSendingFrame)
+
+add_test(
+    NAME MainWindowTest.activate_afterInvalidKey_retriesWithEditedKeyAndOpensFilePageWithoutReconnect
+    COMMAND MainWindowTest activate_afterInvalidKey_retriesWithEditedKeyAndOpensFilePageWithoutReconnect)
+
+add_test(
+    NAME MainWindowTest.connectButton_closedEndpoint_showsConnectionErrorAndAllowsRetry
+    COMMAND MainWindowTest connectButton_closedEndpoint_showsConnectionErrorAndAllowsRetry)
 
 add_test(
     NAME ApplicationControllerTest.initialState_isLockedAndFeatureAccessDenied
