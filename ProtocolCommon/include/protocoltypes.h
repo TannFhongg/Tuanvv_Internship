@@ -1,7 +1,3 @@
-// ID và các enum protocol.
-/*
-
-*/
 #pragma once
 #include <QtGlobal>
 #include <QMetaType>
@@ -21,10 +17,16 @@ namespace MiniCloud::Protocol
 
         BrowseRequest = 5,
         BrowseResponse = 6,
+
         CreateDirectoryRequest = 7,
         FileOperationResponse = 8,
+
         SearchRequest = 9,
-        SearchResponse = 10
+        SearchResponse = 10,
+
+        RenameRequest = 11,
+        MoveRequest = 12,
+        DeleteRequest = 13
     };
 
     enum class ErrorCode : quint16

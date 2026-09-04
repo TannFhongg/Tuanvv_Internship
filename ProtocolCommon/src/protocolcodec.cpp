@@ -21,6 +21,9 @@ namespace MiniCloud::Protocol
             case MessageType::FileOperationResponse:
             case MessageType::SearchRequest:
             case MessageType::SearchResponse:
+            case MessageType::RenameRequest:
+            case MessageType::MoveRequest:
+            case MessageType::DeleteRequest:
                 return true;
             case MessageType::Invalid:
             default:
