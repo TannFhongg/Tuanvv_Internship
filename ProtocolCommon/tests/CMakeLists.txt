@@ -342,3 +342,27 @@ add_test(
     COMMAND FileProtocolCodecTests
             fileChunk_encoder_rejectsEmptyAndOversizeData
 )
+
+add_test(
+    NAME FileProtocolCodecTest.transferControlContracts_validData_roundTripThroughFrames
+    COMMAND FileProtocolCodecTests
+            transferControlContracts_validData_roundTripThroughFrames
+)
+
+add_test(
+    NAME FileProtocolCodecTest.transferControl_fieldLimits_areEnforcedByEncoder
+    COMMAND FileProtocolCodecTests
+            transferControl_fieldLimits_areEnforcedByEncoder
+)
+
+add_test(
+    NAME FileProtocolCodecTest.transferControl_invalidPayloads_failWithoutPartialData
+    COMMAND FileProtocolCodecTests
+            transferControl_invalidPayloads_failWithoutPartialData
+)
+
+add_test(
+    NAME FileProtocolCodecTest.transferControlPayloads_extraFields_areIgnored
+    COMMAND FileProtocolCodecTests
+            transferControlPayloads_extraFields_areIgnored
+)

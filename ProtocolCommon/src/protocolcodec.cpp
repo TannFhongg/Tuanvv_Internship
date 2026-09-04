@@ -24,6 +24,10 @@ namespace MiniCloud::Protocol
             case MessageType::RenameRequest:
             case MessageType::MoveRequest:
             case MessageType::DeleteRequest:
+            case MessageType::UploadStartRequest:
+            case MessageType::UploadReadyResponse:
+            case MessageType::DownloadRequest:
+            case MessageType::DownloadStartResponse:
                 return true;
             case MessageType::Invalid:
             default:
