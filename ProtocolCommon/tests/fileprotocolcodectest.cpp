@@ -6,6 +6,8 @@
 #include <QJsonObject>
 #include <QJsonArray>
 
+#include <limits>
+
 #include "fileprotocol.h"
 #include "frameparser.h"
 #include "protocolcodec.h"
@@ -19,6 +21,14 @@ namespace
         Rename,
         Move,
         Delete
+    };
+
+    enum class TransferControlOperation : int
+    {
+        UploadStart,
+        UploadReady,
+        DownloadRequest,
+        DownloadStart
     };
 
     QByteArray makeRawChunkPayload(quint64 offset, const QByteArray &bytes)
@@ -1126,6 +1136,353 @@ private slots:
         QCOMPARE(result.status, FileProtocolEncodeResult::Status::Failed);
         QVERIFY(!result.errorMessage.isEmpty());
         QVERIFY(result.payload.isEmpty());
+    }
+
+    void transferControlContracts_validData_roundTripThroughFrames()
+    {
+        using namespace MiniCloud::Protocol;
+
+        constexpr quint64 largeSize = 9007199254740993ULL;
+        constexpr RequestId uploadRequestId = 301;
+        constexpr RequestId downloadRequestId = 302;
+
+        const UploadStartRequestData uploadStart{QStringLiteral("/Documents"), QStringLiteral("archive.bin"), largeSize};
+
+        const FileProtocolEncodeResult encodedUploadStart = serializeUploadStartRequest(uploadStart);
+        QCOMPARE(encodedUploadStart.status, FileProtocolEncodeResult::Status::Success);
+        QVERIFY(encodedUploadStart.errorMessage.isEmpty());
+
+        const FrameEncodeResult encodedUploadStartFrame = serializeFrame(
+            MessageType::UploadStartRequest,
+            uploadRequestId,
+            TaskId{0},
+            encodedUploadStart.payload);
+        QCOMPARE(encodedUploadStartFrame.status, FrameEncodeStatus::Success);
+        FrameParser uploadStartParser;
+        uploadStartParser.appendData(encodedUploadStartFrame.encodedFrame);
+        const FrameParser::FrameParseResult parsedUploadStart = uploadStartParser.tryTakeFrame();
+        QCOMPARE(parsedUploadStart.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(parsedUploadStart.frame.header.messageType, MessageType::UploadStartRequest);
+        QCOMPARE(parsedUploadStart.frame.header.requestId, uploadRequestId);
+        QCOMPARE(parsedUploadStart.frame.header.taskId, TaskId{0});
+
+        const UploadStartRequestDecodeResult decodedUploadStart = deserializeUploadStartRequest(parsedUploadStart.frame.payload);
+        QCOMPARE(decodedUploadStart.status, UploadStartRequestDecodeResult::Status::Success);
+        QCOMPARE(decodedUploadStart.data.destinationDirectoryPath, uploadStart.destinationDirectoryPath);
+        QCOMPARE(decodedUploadStart.data.fileName, uploadStart.fileName);
+        QCOMPARE(decodedUploadStart.data.totalSizeBytes, largeSize);
+        QVERIFY(decodedUploadStart.errorMessage.isEmpty());
+
+        const UploadReadyResponseData uploadReady{QStringLiteral("/Documents/archive.bin")};
+        const FileProtocolEncodeResult encodedUploadReady = serializeUploadReadyResponse(uploadReady);
+        QCOMPARE(encodedUploadReady.status, FileProtocolEncodeResult::Status::Success);
+        QVERIFY(encodedUploadReady.errorMessage.isEmpty());
+
+        const FrameEncodeResult encodedUploadReadyFrame = serializeFrame(
+            MessageType::UploadReadyResponse,
+            uploadRequestId,
+            TaskId{0},
+            encodedUploadReady.payload);
+        QCOMPARE(encodedUploadReadyFrame.status, FrameEncodeStatus::Success);
+
+        FrameParser uploadReadyParser;
+        uploadReadyParser.appendData(encodedUploadReadyFrame.encodedFrame);
+        const FrameParser::FrameParseResult parsedUploadReady = uploadReadyParser.tryTakeFrame();
+        QCOMPARE(parsedUploadReady.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(parsedUploadReady.frame.header.messageType, MessageType::UploadReadyResponse);
+        QCOMPARE(parsedUploadReady.frame.header.requestId, uploadRequestId);
+        QCOMPARE(parsedUploadReady.frame.header.taskId, TaskId{0});
+
+        const UploadReadyResponseDecodeResult decodedUploadReady = deserializeUploadReadyResponse(parsedUploadReady.frame.payload);
+        QCOMPARE(decodedUploadReady.status, UploadReadyResponseDecodeResult::Status::Success);
+        QCOMPARE(decodedUploadReady.data.path, uploadReady.path);
+        QVERIFY(decodedUploadReady.errorMessage.isEmpty());
+
+        const DownloadRequestData downloadRequest{QStringLiteral("/Documents/archive.bin")};
+        const FileProtocolEncodeResult encodedDownloadRequest = serializeDownloadRequest(downloadRequest);
+        QCOMPARE(encodedDownloadRequest.status, FileProtocolEncodeResult::Status::Success);
+        QVERIFY(encodedDownloadRequest.errorMessage.isEmpty());
+
+        const FrameEncodeResult encodedDownloadRequestFrame = serializeFrame(
+            MessageType::DownloadRequest,
+            downloadRequestId,
+            TaskId{0},
+            encodedDownloadRequest.payload);
+        QCOMPARE(encodedDownloadRequestFrame.status, FrameEncodeStatus::Success);
+
+        FrameParser downloadRequestParser;
+        downloadRequestParser.appendData(encodedDownloadRequestFrame.encodedFrame);
+        const FrameParser::FrameParseResult parsedDownloadRequest = downloadRequestParser.tryTakeFrame();
+        QCOMPARE(parsedDownloadRequest.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(parsedDownloadRequest.frame.header.messageType, MessageType::DownloadRequest);
+        QCOMPARE(parsedDownloadRequest.frame.header.requestId, downloadRequestId);
+        QCOMPARE(parsedDownloadRequest.frame.header.taskId, TaskId{0});
+
+        const DownloadRequestDecodeResult decodedDownloadRequest = deserializeDownloadRequest(parsedDownloadRequest.frame.payload);
+        QCOMPARE(decodedDownloadRequest.status, DownloadRequestDecodeResult::Status::Success);
+        QCOMPARE(decodedDownloadRequest.data.path, downloadRequest.path);
+        QVERIFY(decodedDownloadRequest.errorMessage.isEmpty());
+
+        const DownloadStartResponseData downloadStart{QStringLiteral("/Documents/archive.bin"), largeSize};
+        const FileProtocolEncodeResult encodedDownloadStart = serializeDownloadStartResponse(downloadStart);
+        QCOMPARE(encodedDownloadStart.status, FileProtocolEncodeResult::Status::Success);
+        QVERIFY(encodedDownloadStart.errorMessage.isEmpty());
+
+        const FrameEncodeResult encodedDownloadStartFrame = serializeFrame(
+            MessageType::DownloadStartResponse,
+            downloadRequestId,
+            TaskId{0},
+            encodedDownloadStart.payload);
+        QCOMPARE(encodedDownloadStartFrame.status, FrameEncodeStatus::Success);
+
+        FrameParser downloadStartParser;
+        downloadStartParser.appendData(encodedDownloadStartFrame.encodedFrame);
+        const FrameParser::FrameParseResult parsedDownloadStart = downloadStartParser.tryTakeFrame();
+        QCOMPARE(parsedDownloadStart.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(parsedDownloadStart.frame.header.messageType, MessageType::DownloadStartResponse);
+        QCOMPARE(parsedDownloadStart.frame.header.requestId, downloadRequestId);
+        QCOMPARE(parsedDownloadStart.frame.header.taskId, TaskId{0});
+
+        const DownloadStartResponseDecodeResult decodedDownloadStart = deserializeDownloadStartResponse(parsedDownloadStart.frame.payload);
+        QCOMPARE(decodedDownloadStart.status, DownloadStartResponseDecodeResult::Status::Success);
+        QCOMPARE(decodedDownloadStart.data.path, downloadStart.path);
+        QCOMPARE(decodedDownloadStart.data.totalSizeBytes, largeSize);
+        QVERIFY(decodedDownloadStart.errorMessage.isEmpty());
+    }
+
+    void transferControl_fieldLimits_areEnforcedByEncoder_data()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QTest::addColumn<int>("operation");
+        QTest::addColumn<QString>("path");
+        QTest::addColumn<QString>("fileName");
+        QTest::addColumn<quint64>("totalSizeBytes");
+        QTest::addColumn<bool>("shouldSucceed");
+
+        const int uploadStart = static_cast<int>(TransferControlOperation::UploadStart);
+        const int uploadReady = static_cast<int>(TransferControlOperation::UploadReady);
+        const int downloadRequest = static_cast<int>(TransferControlOperation::DownloadRequest);
+        const int downloadStart = static_cast<int>(TransferControlOperation::DownloadStart);
+
+        const quint64 maximumQuint64 = std::numeric_limits<quint64>::max();
+        const QString exactLimitPath = QStringLiteral("/") + QString(protocolMaxLogicalPathUtf8Bytes - 1, QLatin1Char('p'));
+        const QString exactLimitFileName(protocolMaxFileNameUtf8Bytes, QLatin1Char('n'));
+        const QString overLimitPath = QStringLiteral("/") + QString(protocolMaxLogicalPathUtf8Bytes, QLatin1Char('p'));
+
+        QTest::newRow("upload-start-normal") << uploadStart << QStringLiteral("/Documents") << QStringLiteral("archive.bin") << quint64{42} << true;
+        QTest::newRow("upload-start-zero-byte-file") << uploadStart << QStringLiteral("/Documents") << QStringLiteral("empty.bin") << quint64{0} << true;
+        QTest::newRow("upload-start-maximum-quint64") << uploadStart << QStringLiteral("/Documents") << QStringLiteral("large.bin") << maximumQuint64 << true;
+        QTest::newRow("upload-start-exact-path-and-name-limits") << uploadStart << exactLimitPath << exactLimitFileName << quint64{1} << true;
+        QTest::newRow("upload-start-blank-destination") << uploadStart << QStringLiteral("   ") << QStringLiteral("archive.bin") << quint64{1} << false;
+        QTest::newRow("upload-start-destination-over-limit") << uploadStart << overLimitPath << QStringLiteral("archive.bin") << quint64{1} << false;
+        QTest::newRow("upload-start-blank-file-name") << uploadStart << QStringLiteral("/Documents") << QStringLiteral("   ") << quint64{1} << false;
+        QTest::newRow("upload-start-file-name-over-limit-unicode") << uploadStart << QStringLiteral("/Documents") << QString(128, QChar(0x00E9)) << quint64{1} << false;
+
+        QTest::newRow("upload-ready-normal") << uploadReady << QStringLiteral("/Documents/archive.bin") << QString() << quint64{0} << true;
+        QTest::newRow("upload-ready-blank-path") << uploadReady << QStringLiteral("   ") << QString() << quint64{0} << false;
+        QTest::newRow("upload-ready-path-over-limit") << uploadReady << overLimitPath << QString() << quint64{0} << false;
+
+        QTest::newRow("download-request-normal") << downloadRequest << QStringLiteral("/Documents/archive.bin") << QString() << quint64{0} << true;
+        QTest::newRow("download-request-blank-path") << downloadRequest << QStringLiteral("   ") << QString() << quint64{0} << false;
+        QTest::newRow("download-request-path-over-limit") << downloadRequest << overLimitPath << QString() << quint64{0} << false;
+
+        QTest::newRow("download-start-normal") << downloadStart << QStringLiteral("/Documents/archive.bin") << QString() << quint64{42} << true;
+        QTest::newRow("download-start-maximum-quint64") << downloadStart << QStringLiteral("/Documents/archive.bin") << QString() << maximumQuint64 << true;
+        QTest::newRow("download-start-blank-path") << downloadStart << QStringLiteral("   ") << QString() << quint64{1} << false;
+        QTest::newRow("download-start-path-over-limit") << downloadStart << overLimitPath << QString() << quint64{1} << false;
+    }
+
+    void transferControl_fieldLimits_areEnforcedByEncoder()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QFETCH(int, operation);
+        QFETCH(QString, path);
+        QFETCH(QString, fileName);
+        QFETCH(quint64, totalSizeBytes);
+        QFETCH(bool, shouldSucceed);
+
+        FileProtocolEncodeResult result;
+
+        switch (static_cast<TransferControlOperation>(operation))
+        {
+        case TransferControlOperation::UploadStart:
+            result = serializeUploadStartRequest({path, fileName, totalSizeBytes});
+            break;
+        case TransferControlOperation::UploadReady:
+            result = serializeUploadReadyResponse({path});
+            break;
+        case TransferControlOperation::DownloadRequest:
+            result = serializeDownloadRequest({path});
+            break;
+        case TransferControlOperation::DownloadStart:
+            result = serializeDownloadStartResponse({path, totalSizeBytes});
+            break;
+        default:
+            QFAIL("Unknown transfer control operation.");
+            return;
+        }
+
+        QCOMPARE(result.status == FileProtocolEncodeResult::Status::Success, shouldSucceed);
+
+        if (shouldSucceed)
+        {
+            QVERIFY(result.errorMessage.isEmpty());
+            QVERIFY(!result.payload.isEmpty());
+        }
+        else
+        {
+            QVERIFY(!result.errorMessage.isEmpty());
+            QVERIFY(result.payload.isEmpty());
+        }
+    }
+
+    void transferControl_invalidPayloads_failWithoutPartialData_data()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QTest::addColumn<int>("operation");
+        QTest::addColumn<QByteArray>("payload");
+
+        const int uploadStart = static_cast<int>(TransferControlOperation::UploadStart);
+        const int uploadReady = static_cast<int>(TransferControlOperation::UploadReady);
+        const int downloadRequest = static_cast<int>(TransferControlOperation::DownloadRequest);
+        const int downloadStart = static_cast<int>(TransferControlOperation::DownloadStart);
+
+        QTest::newRow("upload-malformed-json") << uploadStart << QByteArrayLiteral(R"({"destinationDirectoryPath":"/Documents","fileName":"a.bin","totalSizeBytes":)");
+        QTest::newRow("upload-json-array") << uploadStart << QByteArrayLiteral(R"(["/Documents","a.bin","0"])");
+        QTest::newRow("upload-missing-destination") << uploadStart << QByteArrayLiteral(R"({"fileName":"a.bin","totalSizeBytes":"0"})");
+        QTest::newRow("upload-destination-wrong-type") << uploadStart << QByteArrayLiteral(R"({"destinationDirectoryPath":7,"fileName":"a.bin","totalSizeBytes":"0"})");
+        QTest::newRow("upload-blank-destination") << uploadStart << QByteArrayLiteral(R"({"destinationDirectoryPath":"   ","fileName":"a.bin","totalSizeBytes":"0"})");
+        QTest::newRow("upload-missing-file-name") << uploadStart << QByteArrayLiteral(R"({"destinationDirectoryPath":"/Documents","totalSizeBytes":"0"})");
+        QTest::newRow("upload-file-name-wrong-type") << uploadStart << QByteArrayLiteral(R"({"destinationDirectoryPath":"/Documents","fileName":false,"totalSizeBytes":"0"})");
+        QTest::newRow("upload-blank-file-name") << uploadStart << QByteArrayLiteral(R"({"destinationDirectoryPath":"/Documents","fileName":"   ","totalSizeBytes":"0"})");
+        QTest::newRow("upload-missing-total-size") << uploadStart << QByteArrayLiteral(R"({"destinationDirectoryPath":"/Documents","fileName":"a.bin"})");
+        QTest::newRow("upload-total-size-json-number") << uploadStart << QByteArrayLiteral(R"({"destinationDirectoryPath":"/Documents","fileName":"a.bin","totalSizeBytes":42})");
+        QTest::newRow("upload-total-size-empty-string") << uploadStart << QByteArrayLiteral(R"({"destinationDirectoryPath":"/Documents","fileName":"a.bin","totalSizeBytes":""})");
+        QTest::newRow("upload-total-size-negative") << uploadStart << QByteArrayLiteral(R"({"destinationDirectoryPath":"/Documents","fileName":"a.bin","totalSizeBytes":"-1"})");
+        QTest::newRow("upload-total-size-decimal") << uploadStart << QByteArrayLiteral(R"({"destinationDirectoryPath":"/Documents","fileName":"a.bin","totalSizeBytes":"1.5"})");
+        QTest::newRow("upload-total-size-overflow") << uploadStart << QByteArrayLiteral(R"({"destinationDirectoryPath":"/Documents","fileName":"a.bin","totalSizeBytes":"18446744073709551616"})");
+
+        const QString overLimitPath = QStringLiteral("/") + QString(protocolMaxLogicalPathUtf8Bytes, QLatin1Char('p'));
+        QJsonObject overLimitPathObject;
+        overLimitPathObject.insert(QStringLiteral("path"), overLimitPath);
+        const QByteArray overLimitPathPayload = QJsonDocument(overLimitPathObject).toJson(QJsonDocument::Compact);
+
+        QTest::newRow("upload-ready-malformed-json") << uploadReady << QByteArrayLiteral(R"({"path":)");
+        QTest::newRow("upload-ready-missing-path") << uploadReady << QByteArrayLiteral(R"({})");
+        QTest::newRow("upload-ready-path-wrong-type") << uploadReady << QByteArrayLiteral(R"({"path":7})");
+        QTest::newRow("upload-ready-blank-path") << uploadReady << QByteArrayLiteral(R"({"path":"   "})");
+        QTest::newRow("upload-ready-path-over-limit") << uploadReady << overLimitPathPayload;
+
+        QTest::newRow("download-malformed-json") << downloadRequest << QByteArrayLiteral(R"({"path":)");
+        QTest::newRow("download-json-array") << downloadRequest << QByteArrayLiteral(R"(["/Documents/archive.bin"])");
+        QTest::newRow("download-missing-path") << downloadRequest << QByteArrayLiteral(R"({})");
+        QTest::newRow("download-path-wrong-type") << downloadRequest << QByteArrayLiteral(R"({"path":true})");
+        QTest::newRow("download-blank-path") << downloadRequest << QByteArrayLiteral(R"({"path":"   "})");
+        QTest::newRow("download-path-over-limit") << downloadRequest << overLimitPathPayload;
+
+        QTest::newRow("download-start-malformed-json") << downloadStart << QByteArrayLiteral(R"({"path":"/Documents/archive.bin","totalSizeBytes":)");
+        QTest::newRow("download-start-missing-path") << downloadStart << QByteArrayLiteral(R"({"totalSizeBytes":"0"})");
+        QTest::newRow("download-start-blank-path") << downloadStart << QByteArrayLiteral(R"({"path":"   ","totalSizeBytes":"0"})");
+        QTest::newRow("download-start-missing-total-size") << downloadStart << QByteArrayLiteral(R"({"path":"/Documents/archive.bin"})");
+        QTest::newRow("download-start-total-size-json-number") << downloadStart << QByteArrayLiteral(R"({"path":"/Documents/archive.bin","totalSizeBytes":42})");
+        QTest::newRow("download-start-total-size-negative") << downloadStart << QByteArrayLiteral(R"({"path":"/Documents/archive.bin","totalSizeBytes":"-1"})");
+        QTest::newRow("download-start-total-size-overflow") << downloadStart << QByteArrayLiteral(R"({"path":"/Documents/archive.bin","totalSizeBytes":"18446744073709551616"})");
+    }
+
+    void transferControl_invalidPayloads_failWithoutPartialData()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QFETCH(int, operation);
+        QFETCH(QByteArray, payload);
+
+        switch (static_cast<TransferControlOperation>(operation))
+        {
+        case TransferControlOperation::UploadStart:
+        {
+            const UploadStartRequestDecodeResult result = deserializeUploadStartRequest(payload);
+            QCOMPARE(result.status, UploadStartRequestDecodeResult::Status::Failed);
+            QVERIFY(!result.errorMessage.isEmpty());
+            QVERIFY(result.data.destinationDirectoryPath.isEmpty());
+            QVERIFY(result.data.fileName.isEmpty());
+            QCOMPARE(result.data.totalSizeBytes, quint64{0});
+            break;
+        }
+        case TransferControlOperation::UploadReady:
+        {
+            const UploadReadyResponseDecodeResult result = deserializeUploadReadyResponse(payload);
+            QCOMPARE(result.status, UploadReadyResponseDecodeResult::Status::Failed);
+            QVERIFY(!result.errorMessage.isEmpty());
+            QVERIFY(result.data.path.isEmpty());
+            break;
+        }
+        case TransferControlOperation::DownloadRequest:
+        {
+            const DownloadRequestDecodeResult result = deserializeDownloadRequest(payload);
+            QCOMPARE(result.status, DownloadRequestDecodeResult::Status::Failed);
+            QVERIFY(!result.errorMessage.isEmpty());
+            QVERIFY(result.data.path.isEmpty());
+            break;
+        }
+        case TransferControlOperation::DownloadStart:
+        {
+            const DownloadStartResponseDecodeResult result = deserializeDownloadStartResponse(payload);
+            QCOMPARE(result.status, DownloadStartResponseDecodeResult::Status::Failed);
+            QVERIFY(!result.errorMessage.isEmpty());
+            QVERIFY(result.data.path.isEmpty());
+            QCOMPARE(result.data.totalSizeBytes, quint64{0});
+            break;
+        }
+        default:
+            QFAIL("Unknown transfer control operation.");
+            return;
+        }
+    }
+
+    void transferControlPayloads_extraFields_areIgnored()
+    {
+        using namespace MiniCloud::Protocol;
+
+        const UploadStartRequestDecodeResult uploadStart = deserializeUploadStartRequest(
+            QByteArrayLiteral(
+                R"({"destinationDirectoryPath":"/Documents",)"
+                R"("fileName":"archive.bin",)"
+                R"("totalSizeBytes":"42",)"
+                R"("checksum":"deferred"})"));
+
+        QCOMPARE(uploadStart.status, UploadStartRequestDecodeResult::Status::Success);
+        QVERIFY(uploadStart.errorMessage.isEmpty());
+        QCOMPARE(uploadStart.data.destinationDirectoryPath, QStringLiteral("/Documents"));
+        QCOMPARE(uploadStart.data.fileName, QStringLiteral("archive.bin"));
+        QCOMPARE(uploadStart.data.totalSizeBytes, quint64{42});
+
+        const UploadReadyResponseDecodeResult uploadReady = deserializeUploadReadyResponse(QByteArrayLiteral(R"({"path":"/Documents/archive.bin",)"
+                                                                                                             R"("temporaryUploadId":"not-used-in-mvp"})"));
+
+        QCOMPARE(uploadReady.status, UploadReadyResponseDecodeResult::Status::Success);
+        QVERIFY(uploadReady.errorMessage.isEmpty());
+        QCOMPARE(uploadReady.data.path, QStringLiteral("/Documents/archive.bin"));
+
+        const DownloadRequestDecodeResult downloadRequest = deserializeDownloadRequest(QByteArrayLiteral(
+            R"({"path":"/Documents/archive.bin",)"
+            R"("resumeOffset":"0"})"));
+
+        QCOMPARE(downloadRequest.status, DownloadRequestDecodeResult::Status::Success);
+        QVERIFY(downloadRequest.errorMessage.isEmpty());
+        QCOMPARE(downloadRequest.data.path, QStringLiteral("/Documents/archive.bin"));
+
+        const DownloadStartResponseDecodeResult downloadStart = deserializeDownloadStartResponse(QByteArrayLiteral(
+            R"({"path":"/Documents/archive.bin",)"
+            R"("totalSizeBytes":"42",)"
+            R"("checksum":"deferred"})"));
+
+        QCOMPARE(downloadStart.status, DownloadStartResponseDecodeResult::Status::Success);
+        QVERIFY(downloadStart.errorMessage.isEmpty());
+        QCOMPARE(downloadStart.data.path, QStringLiteral("/Documents/archive.bin"));
+        QCOMPARE(downloadStart.data.totalSizeBytes, quint64{42});
     }
 };
 
