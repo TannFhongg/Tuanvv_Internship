@@ -19,6 +19,8 @@ namespace MiniCloud::Protocol
             case MessageType::BrowseResponse:
             case MessageType::CreateDirectoryRequest:
             case MessageType::FileOperationResponse:
+            case MessageType::SearchRequest:
+            case MessageType::SearchResponse:
                 return true;
             case MessageType::Invalid:
             default:
