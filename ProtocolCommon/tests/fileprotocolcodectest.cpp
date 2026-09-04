@@ -9,6 +9,16 @@
 #include "protocolcodec.h"
 #include "protocoltypes.h"
 
+namespace
+{
+    enum class MutationOperation : int
+    {
+        Rename,
+        Move,
+        Delete
+    };
+}
+
 class FileProtocolCodecTest : public QObject
 {
     Q_OBJECT
@@ -727,6 +737,286 @@ private slots:
         QCOMPARE(decodedExtraResponse.data.path, QStringLiteral("/Documents"));
         QVERIFY(decodedExtraResponse.data.entries.isEmpty());
         QVERIFY(decodedExtraResponse.errorMessage.isEmpty());
+    }
+
+    void mutationContracts_validData_roundTripThroughFrames()
+    {
+        using namespace MiniCloud::Protocol;
+
+        constexpr RequestId renameRequestId = 201;
+        const RenameRequestData renameOriginal{QStringLiteral("/Documents/old-name.txt"), QStringLiteral("new-name.txt")};
+
+        const FileProtocolEncodeResult renamePayload = serializeRenameRequest(renameOriginal);
+        QCOMPARE(renamePayload.status, FileProtocolEncodeResult::Status::Success);
+
+        const FrameEncodeResult renameFrame = serializeFrame(
+            MessageType::RenameRequest,
+            renameRequestId,
+            TaskId{0},
+            renamePayload.payload);
+        QCOMPARE(renameFrame.status, FrameEncodeStatus::Success);
+
+        FrameParser renameParser;
+        renameParser.appendData(renameFrame.encodedFrame);
+        const auto parsedRename = renameParser.tryTakeFrame();
+        QCOMPARE(parsedRename.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(parsedRename.frame.header.messageType, MessageType::RenameRequest);
+        QCOMPARE(parsedRename.frame.header.requestId, renameRequestId);
+        QCOMPARE(parsedRename.frame.header.taskId, TaskId{0});
+
+        const RenameRequestDecodeResult decodedRename = deserializeRenameRequest(parsedRename.frame.payload);
+        QCOMPARE(decodedRename.status, RenameRequestDecodeResult::Status::Success);
+        QCOMPARE(decodedRename.data.path, renameOriginal.path);
+        QCOMPARE(decodedRename.data.newName, renameOriginal.newName);
+
+        constexpr RequestId moveRequestId = 202;
+        const MoveRequestData moveOriginal{QStringLiteral("/Documents/new-name.txt"), QStringLiteral("/Archive")};
+
+        const FileProtocolEncodeResult movePayload = serializeMoveRequest(moveOriginal);
+        QCOMPARE(movePayload.status, FileProtocolEncodeResult::Status::Success);
+
+        const FrameEncodeResult moveFrame = serializeFrame(
+            MessageType::MoveRequest,
+            moveRequestId,
+            TaskId{0},
+            movePayload.payload);
+        QCOMPARE(moveFrame.status, FrameEncodeStatus::Success);
+
+        FrameParser moveParser;
+        moveParser.appendData(moveFrame.encodedFrame);
+        const auto parsedMove = moveParser.tryTakeFrame();
+        QCOMPARE(parsedMove.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(parsedMove.frame.header.messageType, MessageType::MoveRequest);
+        QCOMPARE(parsedMove.frame.header.requestId, moveRequestId);
+        QCOMPARE(parsedMove.frame.header.taskId, TaskId{0});
+
+        const MoveRequestDecodeResult decodedMove = deserializeMoveRequest(parsedMove.frame.payload);
+        QCOMPARE(decodedMove.status, MoveRequestDecodeResult::Status::Success);
+        QCOMPARE(decodedMove.data.sourcePath, moveOriginal.sourcePath);
+        QCOMPARE(decodedMove.data.destinationDirectoryPath, moveOriginal.destinationDirectoryPath);
+
+        constexpr RequestId deleteRequestId = 203;
+        const DeleteRequestData deleteOriginal{QStringLiteral("/Archive/new-name.txt")};
+
+        const FileProtocolEncodeResult deletePayload = serializeDeleteRequest(deleteOriginal);
+        QCOMPARE(deletePayload.status, FileProtocolEncodeResult::Status::Success);
+
+        const FrameEncodeResult deleteFrame = serializeFrame(
+            MessageType::DeleteRequest,
+            deleteRequestId,
+            TaskId{0},
+            deletePayload.payload);
+        QCOMPARE(deleteFrame.status, FrameEncodeStatus::Success);
+        FrameParser deleteParser;
+        deleteParser.appendData(deleteFrame.encodedFrame);
+        const auto parsedDelete = deleteParser.tryTakeFrame();
+        QCOMPARE(parsedDelete.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(parsedDelete.frame.header.messageType, MessageType::DeleteRequest);
+        QCOMPARE(parsedDelete.frame.header.requestId, deleteRequestId);
+        QCOMPARE(parsedDelete.frame.header.taskId, TaskId{0});
+
+        const DeleteRequestDecodeResult decodedDelete = deserializeDeleteRequest(parsedDelete.frame.payload);
+        QCOMPARE(decodedDelete.status, DeleteRequestDecodeResult::Status::Success);
+        QCOMPARE(decodedDelete.data.path, deleteOriginal.path);
+    }
+
+    void mutationRequests_fieldLimits_areEnforcedByEncoder_data()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QTest::addColumn<int>("operation");
+        QTest::addColumn<QString>("firstPath");
+        QTest::addColumn<QString>("secondField");
+        QTest::addColumn<bool>("shouldSucceed");
+
+        const QString exactPath = QStringLiteral("/") + QString(protocolMaxLogicalPathUtf8Bytes - 1, QLatin1Char('p'));
+        const QString overLimitPath = QStringLiteral("/") + QString(protocolMaxLogicalPathUtf8Bytes, QLatin1Char('p'));
+        const QString exactName(protocolMaxFileNameUtf8Bytes, QLatin1Char('n'));
+        const QString overLimitUnicodeName(128, QChar(0x00E9));
+
+        QTest::newRow("rename-normal") << static_cast<int>(MutationOperation::Rename) << QStringLiteral("/Documents/old-name.txt") << QStringLiteral("new-name.txt") << true;
+        QTest::newRow("rename-exact-limits") << static_cast<int>(MutationOperation::Rename) << exactPath << exactName << true;
+        QTest::newRow("rename-blank-path") << static_cast<int>(MutationOperation::Rename) << QStringLiteral("   ") << QStringLiteral("new-name.txt") << false;
+        QTest::newRow("rename-path-over-limit") << static_cast<int>(MutationOperation::Rename) << overLimitPath << QStringLiteral("new-name.txt") << false;
+        QTest::newRow("rename-blank-new-name") << static_cast<int>(MutationOperation::Rename) << QStringLiteral("/Documents/old-name.txt") << QStringLiteral("   ") << false;
+        QTest::newRow("rename-new-name-over-limit-unicode") << static_cast<int>(MutationOperation::Rename) << QStringLiteral("/Documents/old-name.txt") << overLimitUnicodeName << false;
+
+        QTest::newRow("move-normal") << static_cast<int>(MutationOperation::Move) << QStringLiteral("/Documents/report.pdf") << QStringLiteral("/Archive") << true;
+        QTest::newRow("move-source-blank") << static_cast<int>(MutationOperation::Move) << QStringLiteral("   ") << QStringLiteral("/Archive") << false;
+        QTest::newRow("move-source-over-limit") << static_cast<int>(MutationOperation::Move) << overLimitPath << QStringLiteral("/Archive") << false;
+        QTest::newRow("move-destination-blank") << static_cast<int>(MutationOperation::Move) << QStringLiteral("/Documents/report.pdf") << QStringLiteral("   ") << false;
+        QTest::newRow("move-destination-over-limit") << static_cast<int>(MutationOperation::Move) << QStringLiteral("/Documents/report.pdf") << overLimitPath << false;
+
+        QTest::newRow("delete-normal") << static_cast<int>(MutationOperation::Delete) << QStringLiteral("/Documents/report.pdf") << QString() << true;
+        QTest::newRow("delete-root-path") << static_cast<int>(MutationOperation::Delete) << QStringLiteral("/") << QString() << true;
+        QTest::newRow("delete-blank-path") << static_cast<int>(MutationOperation::Delete) << QStringLiteral("   ") << QString() << false;
+        QTest::newRow("delete-path-over-limit") << static_cast<int>(MutationOperation::Delete) << overLimitPath << QString() << false;
+    }
+
+    void mutationRequests_fieldLimits_areEnforcedByEncoder()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QFETCH(int, operation);
+        QFETCH(QString, firstPath);
+        QFETCH(QString, secondField);
+        QFETCH(bool, shouldSucceed);
+
+        FileProtocolEncodeResult result;
+
+        switch (static_cast<MutationOperation>(operation))
+        {
+        case MutationOperation::Rename:
+            result = serializeRenameRequest({firstPath, secondField});
+            break;
+        case MutationOperation::Move:
+            result = serializeMoveRequest({firstPath, secondField});
+            break;
+        case MutationOperation::Delete:
+            result = serializeDeleteRequest({firstPath});
+            break;
+        default:
+            QFAIL("Unknown mutation operation.");
+            return;
+        }
+
+        QCOMPARE(result.status == FileProtocolEncodeResult::Status::Success, shouldSucceed);
+
+        if (shouldSucceed)
+        {
+            QVERIFY(result.errorMessage.isEmpty());
+            QVERIFY(!result.payload.isEmpty());
+        }
+        else
+        {
+            QVERIFY(!result.errorMessage.isEmpty());
+            QVERIFY(result.payload.isEmpty());
+        }
+    }
+
+    void mutationRequests_invalidPayload_failWithoutPartialData_data()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QTest::addColumn<int>("operation");
+        QTest::addColumn<QByteArray>("payload");
+
+        QTest::newRow("rename-malformed-json") << static_cast<int>(MutationOperation::Rename) << QByteArrayLiteral(R"({"path":"/Documents/report.txt","newName":)");
+        QTest::newRow("rename-json-array") << static_cast<int>(MutationOperation::Rename) << QByteArrayLiteral(R"(["/Documents/report.txt","renamed.txt"])");
+        QTest::newRow("rename-missing-path") << static_cast<int>(MutationOperation::Rename) << QByteArrayLiteral(R"({"newName":"renamed.txt"})");
+        QTest::newRow("rename-path-wrong-type") << static_cast<int>(MutationOperation::Rename) << QByteArrayLiteral(R"({"path":7,"newName":"renamed.txt"})");
+        QTest::newRow("rename-blank-path") << static_cast<int>(MutationOperation::Rename) << QByteArrayLiteral(R"({"path":"   ","newName":"renamed.txt"})");
+        QTest::newRow("rename-missing-new-name") << static_cast<int>(MutationOperation::Rename) << QByteArrayLiteral(R"({"path":"/Documents/report.txt"})");
+        QTest::newRow("rename-new-name-wrong-type") << static_cast<int>(MutationOperation::Rename) << QByteArrayLiteral(R"({"path":"/Documents/report.txt","newName":false})");
+        QTest::newRow("rename-blank-new-name") << static_cast<int>(MutationOperation::Rename) << QByteArrayLiteral(R"({"path":"/Documents/report.txt","newName":"   "})");
+
+        const QString overLimitNewName(128, QChar(0x00E9));
+        QJsonObject overLimitRenameObject;
+        overLimitRenameObject.insert(QStringLiteral("path"), QStringLiteral("/Documents/report.txt"));
+        overLimitRenameObject.insert(QStringLiteral("newName"), overLimitNewName);
+        QTest::newRow("rename-new-name-over-limit") << static_cast<int>(MutationOperation::Rename) << QJsonDocument(overLimitRenameObject).toJson(QJsonDocument::Compact);
+
+        QTest::newRow("move-malformed-json") << static_cast<int>(MutationOperation::Move) << QByteArrayLiteral(R"({"sourcePath":"/Documents/report.txt","destinationDirectoryPath":)");
+        QTest::newRow("move-missing-source-path") << static_cast<int>(MutationOperation::Move) << QByteArrayLiteral(R"({"destinationDirectoryPath":"/Archive"})");
+        QTest::newRow("move-source-path-wrong-type") << static_cast<int>(MutationOperation::Move) << QByteArrayLiteral(R"({"sourcePath":7,"destinationDirectoryPath":"/Archive"})");
+        QTest::newRow("move-blank-source-path") << static_cast<int>(MutationOperation::Move) << QByteArrayLiteral(R"({"sourcePath":"   ","destinationDirectoryPath":"/Archive"})");
+        QTest::newRow("move-missing-destination-directory-path") << static_cast<int>(MutationOperation::Move) << QByteArrayLiteral(R"({"sourcePath":"/Documents/report.txt"})");
+        QTest::newRow("move-destination-directory-path-wrong-type") << static_cast<int>(MutationOperation::Move) << QByteArrayLiteral(R"({"sourcePath":"/Documents/report.txt","destinationDirectoryPath":false})");
+        QTest::newRow("move-blank-destination-directory-path") << static_cast<int>(MutationOperation::Move) << QByteArrayLiteral(R"({"sourcePath":"/Documents/report.txt","destinationDirectoryPath":"   "})");
+
+        const QString overLimitDestination = QStringLiteral("/") + QString(protocolMaxLogicalPathUtf8Bytes, QLatin1Char('d'));
+        QJsonObject overLimitMoveObject;
+        overLimitMoveObject.insert(QStringLiteral("sourcePath"), QStringLiteral("/Documents/report.txt"));
+        overLimitMoveObject.insert(QStringLiteral("destinationDirectoryPath"), overLimitDestination);
+        QTest::newRow("move-destination-directory-path-over-limit") << static_cast<int>(MutationOperation::Move) << QJsonDocument(overLimitMoveObject).toJson(QJsonDocument::Compact);
+
+        QTest::newRow("delete-malformed-json") << static_cast<int>(MutationOperation::Delete) << QByteArrayLiteral(R"({"path":)");
+        QTest::newRow("delete-json-array") << static_cast<int>(MutationOperation::Delete) << QByteArrayLiteral(R"(["/Documents/report.txt"])");
+        QTest::newRow("delete-missing-path") << static_cast<int>(MutationOperation::Delete) << QByteArrayLiteral(R"({})");
+        QTest::newRow("delete-path-wrong-type") << static_cast<int>(MutationOperation::Delete) << QByteArrayLiteral(R"({"path":7})");
+        QTest::newRow("delete-blank-path") << static_cast<int>(MutationOperation::Delete) << QByteArrayLiteral(R"({"path":"   "})");
+
+        const QString overLimitDeletePath = QStringLiteral("/") + QString(protocolMaxLogicalPathUtf8Bytes, QLatin1Char('p'));
+        QJsonObject overLimitDeleteObject;
+        overLimitDeleteObject.insert(QStringLiteral("path"), overLimitDeletePath);
+        QTest::newRow("delete-path-over-limit") << static_cast<int>(MutationOperation::Delete) << QJsonDocument(overLimitDeleteObject).toJson(QJsonDocument::Compact);
+    }
+
+    void mutationRequests_invalidPayload_failWithoutPartialData()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QFETCH(int, operation);
+        QFETCH(QByteArray, payload);
+
+        switch (static_cast<MutationOperation>(operation))
+        {
+        case MutationOperation::Rename:
+        {
+            const RenameRequestDecodeResult result = deserializeRenameRequest(payload);
+            QCOMPARE(result.status, RenameRequestDecodeResult::Status::Failed);
+            QVERIFY(!result.errorMessage.isEmpty());
+            QVERIFY(result.data.path.isEmpty());
+            QVERIFY(result.data.newName.isEmpty());
+            break;
+        }
+        case MutationOperation::Move:
+        {
+            const MoveRequestDecodeResult result = deserializeMoveRequest(payload);
+            QCOMPARE(result.status, MoveRequestDecodeResult::Status::Failed);
+            QVERIFY(!result.errorMessage.isEmpty());
+            QVERIFY(result.data.sourcePath.isEmpty());
+            QVERIFY(result.data.destinationDirectoryPath.isEmpty());
+            break;
+        }
+        case MutationOperation::Delete:
+        {
+            const DeleteRequestDecodeResult result = deserializeDeleteRequest(payload);
+            QCOMPARE(result.status, DeleteRequestDecodeResult::Status::Failed);
+            QVERIFY(!result.errorMessage.isEmpty());
+            QVERIFY(result.data.path.isEmpty());
+            break;
+        }
+        default:
+            QFAIL("Unknown mutation operation.");
+            break;
+        }
+    }
+
+    void fileOperationRequestPayloads_extraFields_areIgnored()
+    {
+        using namespace MiniCloud::Protocol;
+
+        const CreateDirectoryRequestDecodeResult createResult = deserializeCreateDirectoryRequest(
+            QByteArrayLiteral(R"({"parentPath":"/Documents","name":"Projects","color":"blue"})"));
+
+        QCOMPARE(createResult.status, CreateDirectoryRequestDecodeResult::Status::Success);
+        QVERIFY(createResult.errorMessage.isEmpty());
+        QCOMPARE(createResult.data.parentPath, QStringLiteral("/Documents"));
+        QCOMPARE(createResult.data.name, QStringLiteral("Projects"));
+
+        const RenameRequestDecodeResult renameResult = deserializeRenameRequest(
+            QByteArrayLiteral(R"({"path":"/Documents/old.txt","newName":"new.txt","overwrite":false})"));
+
+        QCOMPARE(renameResult.status, RenameRequestDecodeResult::Status::Success);
+        QVERIFY(renameResult.errorMessage.isEmpty());
+        QCOMPARE(renameResult.data.path, QStringLiteral("/Documents/old.txt"));
+        QCOMPARE(renameResult.data.newName, QStringLiteral("new.txt"));
+
+        const MoveRequestDecodeResult moveResult = deserializeMoveRequest(
+            QByteArrayLiteral(R"({"sourcePath":"/Documents/new.txt","destinationDirectoryPath":"/Archive","futureOption":{"priority":1}})"));
+
+        QCOMPARE(moveResult.status, MoveRequestDecodeResult::Status::Success);
+        QVERIFY(moveResult.errorMessage.isEmpty());
+        QCOMPARE(moveResult.data.sourcePath, QStringLiteral("/Documents/new.txt"));
+        QCOMPARE(moveResult.data.destinationDirectoryPath, QStringLiteral("/Archive"));
+
+        const DeleteRequestDecodeResult deleteResult = deserializeDeleteRequest(
+            QByteArrayLiteral(R"({"path":"/Archive/new.txt","recursive":true})"));
+
+        QCOMPARE(deleteResult.status, DeleteRequestDecodeResult::Status::Success);
+        QVERIFY(deleteResult.errorMessage.isEmpty());
+        QCOMPARE(deleteResult.data.path, QStringLiteral("/Archive/new.txt"));
     }
 };
 

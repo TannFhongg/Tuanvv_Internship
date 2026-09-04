@@ -300,3 +300,27 @@ add_test(
     COMMAND FileProtocolCodecTests
             searchPayload_emptyResultsAndExtraFields_areHandled
 )
+
+add_test(
+    NAME FileProtocolCodecTest.mutationContracts_validData_roundTripThroughFrames
+    COMMAND FileProtocolCodecTests
+            mutationContracts_validData_roundTripThroughFrames
+)
+
+add_test(
+    NAME FileProtocolCodecTest.mutationRequests_fieldLimits_areEnforcedByEncoder
+    COMMAND FileProtocolCodecTests
+            mutationRequests_fieldLimits_areEnforcedByEncoder
+)
+
+add_test(
+    NAME FileProtocolCodecTest.mutationRequests_invalidPayload_failWithoutPartialData
+    COMMAND FileProtocolCodecTests
+            mutationRequests_invalidPayload_failWithoutPartialData
+)
+
+add_test(
+    NAME FileProtocolCodecTest.fileOperationRequestPayloads_extraFields_areIgnored
+    COMMAND FileProtocolCodecTests
+            fileOperationRequestPayloads_extraFields_areIgnored
+)
