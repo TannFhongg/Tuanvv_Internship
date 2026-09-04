@@ -2,6 +2,7 @@
 
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
 
 #include "fileprotocol.h"
 #include "frameparser.h"
@@ -515,6 +516,217 @@ private slots:
         QCOMPARE(extraFieldsDecode.status, FileOperationResponseDecodeResult::Status::Success);
         QCOMPARE(extraFieldsDecode.data.path, QStringLiteral("/Documents/Projects"));
         QVERIFY(extraFieldsDecode.errorMessage.isEmpty());
+    }
+
+    void searchContract_validData_roundTripsRequestAndResponse()
+    {
+        using namespace MiniCloud::Protocol;
+
+        constexpr RequestId requestId = 105;
+
+        const SearchRequestData originalRequest{QStringLiteral("/Documents"), QStringLiteral("report")};
+
+        const FileProtocolEncodeResult requestPayload = serializeSearchRequest(originalRequest);
+        QCOMPARE(requestPayload.status, FileProtocolEncodeResult::Status::Success);
+
+        const FrameEncodeResult requestFrame = serializeFrame(
+            MessageType::SearchRequest,
+            requestId,
+            TaskId{0},
+            requestPayload.payload);
+        QCOMPARE(requestFrame.status, FrameEncodeStatus::Success);
+        FrameParser requestParser;
+        requestParser.appendData(requestFrame.encodedFrame);
+        const auto parsedRequest = requestParser.tryTakeFrame();
+
+        QCOMPARE(parsedRequest.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(parsedRequest.frame.header.messageType, MessageType::SearchRequest);
+        QCOMPARE(parsedRequest.frame.header.requestId, requestId);
+        QCOMPARE(parsedRequest.frame.header.taskId, TaskId{0});
+
+        const SearchRequestDecodeResult decodedRequest = deserializeSearchRequest(parsedRequest.frame.payload);
+        QCOMPARE(decodedRequest.status, SearchRequestDecodeResult::Status::Success);
+        QCOMPARE(decodedRequest.data.path, originalRequest.path);
+        QCOMPARE(decodedRequest.data.query, originalRequest.query);
+
+        SearchResponseData originalResponse;
+        originalResponse.path = QStringLiteral("/Documents");
+
+        originalResponse.entries = {
+            {QStringLiteral("Annual Report.pdf"),
+             QStringLiteral("/Documents/Annual Report.pdf"),
+             FileEntryType::File,
+             4096,
+             1788424496000ULL},
+
+            {QStringLiteral("report-archive"),
+             QStringLiteral("/Documents/report-archive"),
+             FileEntryType::Directory,
+             0,
+             1788424596000ULL}};
+
+        const FileProtocolEncodeResult responsePayload = serializeSearchResponse(originalResponse);
+        QCOMPARE(responsePayload.status, FileProtocolEncodeResult::Status::Success);
+
+        const FrameEncodeResult responseFrame = serializeFrame(
+            MessageType::SearchResponse,
+            requestId,
+            TaskId{0},
+            responsePayload.payload);
+        QCOMPARE(responseFrame.status, FrameEncodeStatus::Success);
+
+        FrameParser responseParser;
+        responseParser.appendData(responseFrame.encodedFrame);
+        const auto parsedResponse = responseParser.tryTakeFrame();
+        QCOMPARE(parsedResponse.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(parsedResponse.frame.header.messageType, MessageType::SearchResponse);
+        QCOMPARE(parsedResponse.frame.header.requestId, requestId);
+        QCOMPARE(parsedResponse.frame.header.taskId, TaskId{0});
+
+        const SearchResponseDecodeResult decodedResponse = deserializeSearchResponse(parsedResponse.frame.payload);
+        QCOMPARE(decodedResponse.status, SearchResponseDecodeResult::Status::Success);
+        QCOMPARE(decodedResponse.data.path, originalResponse.path);
+        QCOMPARE(decodedResponse.data.entries.size(), 2);
+        QCOMPARE(decodedResponse.data.entries.at(0).name, QStringLiteral("Annual Report.pdf"));
+        QCOMPARE(decodedResponse.data.entries.at(1).name, QStringLiteral("report-archive"));
+    }
+
+    void searchRequest_fieldLimits_areEnforcedByEncoder_data()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QTest::addColumn<QString>("path");
+        QTest::addColumn<QString>("query");
+        QTest::addColumn<bool>("shouldSucceed");
+
+        const QString exactPath = QStringLiteral("/") + QString(protocolMaxLogicalPathUtf8Bytes - 1, QLatin1Char('p'));
+        const QString exactQuery(protocolMaxSearchQueryUtf8Bytes, QLatin1Char('q'));
+
+        QTest::newRow("normal") << QStringLiteral("/Documents") << QStringLiteral("report") << true;
+        QTest::newRow("query-with-surrounding-whitespace") << QStringLiteral("/Documents") << QStringLiteral(" report ") << true;
+        QTest::newRow("exact-limits") << exactPath << exactQuery << true;
+        QTest::newRow("empty-path") << QString() << QStringLiteral("report") << false;
+        QTest::newRow("blank-path") << QStringLiteral("   ") << QStringLiteral("report") << false;
+        QTest::newRow("path-over-limit") << QStringLiteral("/") + QString(protocolMaxLogicalPathUtf8Bytes, QLatin1Char('p')) << QStringLiteral("report") << false;
+        QTest::newRow("empty-query") << QStringLiteral("/Documents") << QString() << false;
+        QTest::newRow("blank-query") << QStringLiteral("/Documents") << QStringLiteral("   ") << false;
+        QTest::newRow("query-over-limit-ascii") << QStringLiteral("/Documents") << QString(protocolMaxSearchQueryUtf8Bytes + 1, QLatin1Char('q')) << false;
+        QTest::newRow("query-over-limit-unicode") << QStringLiteral("/Documents") << QString(128, QChar(0x00E9)) << false;
+    }
+
+    void searchRequest_fieldLimits_areEnforcedByEncoder()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QFETCH(QString, path);
+        QFETCH(QString, query);
+        QFETCH(bool, shouldSucceed);
+
+        const SearchRequestData original{path, query};
+        const FileProtocolEncodeResult encoded = serializeSearchRequest(original);
+
+        if (!shouldSucceed)
+        {
+            QCOMPARE(encoded.status, FileProtocolEncodeResult::Status::Failed);
+            QVERIFY(encoded.payload.isEmpty());
+            QVERIFY(!encoded.errorMessage.isEmpty());
+            return;
+        }
+
+        QCOMPARE(encoded.status, FileProtocolEncodeResult::Status::Success);
+        QVERIFY(!encoded.payload.isEmpty());
+        QVERIFY(encoded.errorMessage.isEmpty());
+
+        const SearchRequestDecodeResult decoded = deserializeSearchRequest(encoded.payload);
+
+        QCOMPARE(decoded.status, SearchRequestDecodeResult::Status::Success);
+        QCOMPARE(decoded.data.path, path);
+        QCOMPARE(decoded.data.query, query);
+        QVERIFY(decoded.errorMessage.isEmpty());
+    }
+
+    void searchRequest_invalidPayload_failsWithoutPartialData_data()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QTest::addColumn<QByteArray>("payload");
+
+        QTest::newRow("malformed-json") << QByteArrayLiteral(R"({"path":"/Documents","query":)");
+        QTest::newRow("json-array") << QByteArrayLiteral(R"(["/Documents","report"])");
+        QTest::newRow("missing-path") << QByteArrayLiteral(R"({"query":"report"})");
+        QTest::newRow("path-wrong-type") << QByteArrayLiteral(R"({"path":7,"query":"report"})");
+        QTest::newRow("blank-path") << QByteArrayLiteral(R"({"path":"   ","query":"report"})");
+        QTest::newRow("missing-query") << QByteArrayLiteral(R"({"path":"/Documents"})");
+        QTest::newRow("query-wrong-type") << QByteArrayLiteral(R"({"path":"/Documents","query":true})");
+        QTest::newRow("empty-query") << QByteArrayLiteral(R"({"path":"/Documents","query":""})");
+        QTest::newRow("blank-query") << QByteArrayLiteral(R"({"path":"/Documents","query":"   "})");
+
+        const QString overLimitPath = QStringLiteral("/") + QString(protocolMaxLogicalPathUtf8Bytes, QLatin1Char('p'));
+        QJsonObject overPathObject;
+        overPathObject.insert(QStringLiteral("path"), overLimitPath);
+        overPathObject.insert(QStringLiteral("query"), QStringLiteral("report"));
+        QTest::newRow("path-over-limit") << QJsonDocument(overPathObject).toJson(QJsonDocument::Compact);
+
+        const QString overLimitQuery(protocolMaxSearchQueryUtf8Bytes + 1, QLatin1Char('q'));
+        QJsonObject overQueryObject;
+        overQueryObject.insert(QStringLiteral("path"), QStringLiteral("/Documents"));
+        overQueryObject.insert(QStringLiteral("query"), overLimitQuery);
+        QTest::newRow("query-over-limit") << QJsonDocument(overQueryObject).toJson(QJsonDocument::Compact);
+    }
+
+    void searchRequest_invalidPayload_failsWithoutPartialData()
+    {
+        QFETCH(QByteArray, payload);
+
+        const auto result = MiniCloud::Protocol::deserializeSearchRequest(payload);
+
+        QCOMPARE(result.status, MiniCloud::Protocol::SearchRequestDecodeResult::Status::Failed);
+
+        QVERIFY(result.data.path.isEmpty());
+        QVERIFY(result.data.query.isEmpty());
+        QVERIFY(!result.errorMessage.isEmpty());
+    }
+
+    void searchPayload_emptyResultsAndExtraFields_areHandled()
+    {
+        using namespace MiniCloud::Protocol;
+
+        const SearchResponseData emptyResponse{QStringLiteral("/Documents"), {}};
+
+        const FileProtocolEncodeResult encoded = serializeSearchResponse(emptyResponse);
+        QCOMPARE(encoded.status, FileProtocolEncodeResult::Status::Success);
+        QVERIFY(!encoded.payload.isEmpty());
+        QVERIFY(encoded.errorMessage.isEmpty());
+
+        const QJsonDocument encodedDocument = QJsonDocument::fromJson(encoded.payload);
+        QVERIFY(encodedDocument.isObject());
+
+        const QJsonObject encodedObject = encodedDocument.object();
+        QCOMPARE(encodedObject.value(QStringLiteral("path")).toString(), QStringLiteral("/Documents"));
+        QVERIFY(encodedObject.value(QStringLiteral("entries")).isArray());
+        QVERIFY(encodedObject.value(QStringLiteral("entries")).toArray().isEmpty());
+
+        const SearchResponseDecodeResult decoded = deserializeSearchResponse(encoded.payload);
+        QCOMPARE(decoded.status, SearchResponseDecodeResult::Status::Success);
+        QCOMPARE(decoded.data.path, QStringLiteral("/Documents"));
+        QVERIFY(decoded.data.entries.isEmpty());
+        QVERIFY(decoded.errorMessage.isEmpty());
+
+        const QByteArray requestWithExtraFields = QByteArrayLiteral(R"({"path":"/Documents","query":"report","futureField":true,"recursive":false})");
+
+        const SearchRequestDecodeResult decodedRequest = deserializeSearchRequest(requestWithExtraFields);
+        QCOMPARE(decodedRequest.status, SearchRequestDecodeResult::Status::Success);
+        QCOMPARE(decodedRequest.data.path, QStringLiteral("/Documents"));
+        QCOMPARE(decodedRequest.data.query, QStringLiteral("report"));
+        QVERIFY(decodedRequest.errorMessage.isEmpty());
+
+        const QByteArray responseWithExtraFields = QByteArrayLiteral(R"({"path":"/Documents","entries":[],"futureField":{"version":2}})");
+
+        const SearchResponseDecodeResult decodedExtraResponse = deserializeSearchResponse(responseWithExtraFields);
+        QCOMPARE(decodedExtraResponse.status, SearchResponseDecodeResult::Status::Success);
+        QCOMPARE(decodedExtraResponse.data.path, QStringLiteral("/Documents"));
+        QVERIFY(decodedExtraResponse.data.entries.isEmpty());
+        QVERIFY(decodedExtraResponse.errorMessage.isEmpty());
     }
 };
 

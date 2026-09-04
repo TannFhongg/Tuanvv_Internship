@@ -276,3 +276,27 @@ add_test(
     COMMAND FileProtocolCodecTests
             fileOperationResponse_pathValidationAndExtraFields_followContract
 )
+
+add_test(
+    NAME FileProtocolCodecTest.searchContract_validData_roundTripsRequestAndResponse
+    COMMAND FileProtocolCodecTests
+            searchContract_validData_roundTripsRequestAndResponse
+)
+
+add_test(
+    NAME FileProtocolCodecTest.searchRequest_fieldLimits_areEnforcedByEncoder
+    COMMAND FileProtocolCodecTests
+            searchRequest_fieldLimits_areEnforcedByEncoder
+)
+
+add_test(
+    NAME FileProtocolCodecTest.searchRequest_invalidPayload_failsWithoutPartialData
+    COMMAND FileProtocolCodecTests
+            searchRequest_invalidPayload_failsWithoutPartialData
+)
+
+add_test(
+    NAME FileProtocolCodecTest.searchPayload_emptyResultsAndExtraFields_areHandled
+    COMMAND FileProtocolCodecTests
+            searchPayload_emptyResultsAndExtraFields_areHandled
+)
