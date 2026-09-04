@@ -153,29 +153,88 @@ namespace MiniCloud::Protocol
         QString errorMessage;
     };
 
-    FileProtocolEncodeResult serializeBrowseRequest(const BrowseRequestData &data);
+    struct RenameRequestData
+    {
+        QString path;
+        QString newName;
+    };
 
+    struct MoveRequestData
+    {
+        QString sourcePath;
+        QString destinationDirectoryPath;
+    };
+
+    struct DeleteRequestData
+    {
+        QString path;
+    };
+
+    struct RenameRequestDecodeResult
+    {
+        enum class Status
+        {
+            Success,
+            Failed
+        };
+
+        Status status = Status::Failed;
+        RenameRequestData data;
+        QString errorMessage;
+    };
+
+    struct MoveRequestDecodeResult
+    {
+        enum class Status
+        {
+            Success,
+            Failed
+        };
+
+        Status status = Status::Failed;
+        MoveRequestData data;
+        QString errorMessage;
+    };
+
+    struct DeleteRequestDecodeResult
+    {
+        enum class Status
+        {
+            Success,
+            Failed
+        };
+
+        Status status = Status::Failed;
+        DeleteRequestData data;
+        QString errorMessage;
+    };
+
+    FileProtocolEncodeResult serializeBrowseRequest(const BrowseRequestData &data);
     BrowseRequestDecodeResult deserializeBrowseRequest(const QByteArray &payload);
 
     FileProtocolEncodeResult serializeCreateDirectoryRequest(const CreateDirectoryRequestData &data);
-
     CreateDirectoryRequestDecodeResult deserializeCreateDirectoryRequest(const QByteArray &payload);
 
     FileProtocolEncodeResult serializeFileOperationResponse(const FileOperationResponseData &data);
-
     FileOperationResponseDecodeResult deserializeFileOperationResponse(const QByteArray &payload);
 
     FileProtocolEncodeResult serializeBrowseResponse(const BrowseResponseData &data);
-
     BrowseResponseDecodeResult deserializeBrowseResponse(const QByteArray &payload);
 
     FileProtocolEncodeResult serializeSearchRequest(const SearchRequestData &data);
-
     SearchRequestDecodeResult deserializeSearchRequest(const QByteArray &payload);
 
     FileProtocolEncodeResult serializeSearchResponse(const SearchResponseData &data);
-
     SearchResponseDecodeResult deserializeSearchResponse(const QByteArray &payload);
+
+    FileProtocolEncodeResult serializeRenameRequest(const RenameRequestData &data);
+    RenameRequestDecodeResult deserializeRenameRequest(const QByteArray &payload);
+
+    FileProtocolEncodeResult serializeMoveRequest(const MoveRequestData &data);
+    MoveRequestDecodeResult deserializeMoveRequest(const QByteArray &payload);
+
+    FileProtocolEncodeResult serializeDeleteRequest(const DeleteRequestData &data);
+    DeleteRequestDecodeResult deserializeDeleteRequest(const QByteArray &payload);
 }
 
 Q_DECLARE_METATYPE(MiniCloud::Protocol::FileEntryType)

@@ -562,3 +562,196 @@ MiniCloud::Protocol::SearchResponseDecodeResult MiniCloud::Protocol::deserialize
     result.status = SearchResponseDecodeResult::Status::Success;
     return result;
 }
+
+MiniCloud::Protocol::FileProtocolEncodeResult MiniCloud::Protocol::serializeRenameRequest(const RenameRequestData &data)
+{
+    FileProtocolEncodeResult result;
+
+    if (!isValidLogicalPathField(data.path) || !isValidFileNameField(data.newName))
+    {
+        result.errorMessage = QStringLiteral("Rename request has invalid path or new name.");
+        return result;
+    }
+
+    QJsonObject object;
+    object.insert(QStringLiteral("path"), data.path);
+    object.insert(QStringLiteral("newName"), data.newName);
+
+    result.payload = QJsonDocument(object).toJson(QJsonDocument::Compact);
+    result.status = FileProtocolEncodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::RenameRequestDecodeResult MiniCloud::Protocol::deserializeRenameRequest(const QByteArray &payload)
+{
+    RenameRequestDecodeResult result;
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+
+    if (parseError.error != QJsonParseError::NoError)
+    {
+        result.errorMessage = parseError.errorString();
+        return result;
+    }
+
+    if (!document.isObject())
+    {
+        result.errorMessage = QStringLiteral("Rename request payload must be a JSON object.");
+        return result;
+    }
+
+    const QJsonObject object = document.object();
+    const QJsonValue pathValue = object.value(QStringLiteral("path"));
+    const QJsonValue newNameValue = object.value(QStringLiteral("newName"));
+
+    if (!pathValue.isString() || !newNameValue.isString())
+    {
+        result.errorMessage = QStringLiteral("Rename request JSON has missing or invalid fields.");
+        return result;
+    }
+
+    const QString path = pathValue.toString();
+    const QString newName = newNameValue.toString();
+
+    if (!isValidLogicalPathField(path) || !isValidFileNameField(newName))
+    {
+        result.errorMessage = QStringLiteral("Rename request JSON has missing or invalid fields.");
+        return result;
+    }
+
+    RenameRequestData candidate;
+    candidate.path = path;
+    candidate.newName = newName;
+
+    result.data = candidate;
+    result.status = RenameRequestDecodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::FileProtocolEncodeResult MiniCloud::Protocol::serializeMoveRequest(const MoveRequestData &data)
+{
+    FileProtocolEncodeResult result;
+
+    if (!isValidLogicalPathField(data.sourcePath) || !isValidLogicalPathField(data.destinationDirectoryPath))
+    {
+        result.errorMessage = QStringLiteral("Move request has invalid source or destination path.");
+        return result;
+    }
+
+    QJsonObject object;
+    object.insert(QStringLiteral("sourcePath"), data.sourcePath);
+    object.insert(QStringLiteral("destinationDirectoryPath"), data.destinationDirectoryPath);
+
+    result.payload = QJsonDocument(object).toJson(QJsonDocument::Compact);
+    result.status = FileProtocolEncodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::MoveRequestDecodeResult MiniCloud::Protocol::deserializeMoveRequest(const QByteArray &payload)
+{
+    MoveRequestDecodeResult result;
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+
+    if (parseError.error != QJsonParseError::NoError)
+    {
+        result.errorMessage = parseError.errorString();
+        return result;
+    }
+
+    if (!document.isObject())
+    {
+        result.errorMessage = QStringLiteral("Move request payload must be a JSON object.");
+        return result;
+    }
+
+    const QJsonObject object = document.object();
+    const QJsonValue sourcePathValue = object.value(QStringLiteral("sourcePath"));
+    const QJsonValue destinationDirectoryPathValue = object.value(QStringLiteral("destinationDirectoryPath"));
+
+    if (!sourcePathValue.isString() || !destinationDirectoryPathValue.isString())
+    {
+        result.errorMessage = QStringLiteral("Move request JSON has missing or invalid fields.");
+        return result;
+    }
+
+    const QString sourcePath = sourcePathValue.toString();
+    const QString destinationDirectoryPath = destinationDirectoryPathValue.toString();
+
+    if (!isValidLogicalPathField(sourcePath) || !isValidLogicalPathField(destinationDirectoryPath))
+    {
+        result.errorMessage = QStringLiteral("Move request JSON has missing or invalid fields.");
+        return result;
+    }
+
+    MoveRequestData candidate;
+    candidate.sourcePath = sourcePath;
+    candidate.destinationDirectoryPath = destinationDirectoryPath;
+
+    result.data = candidate;
+    result.status = MoveRequestDecodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::FileProtocolEncodeResult MiniCloud::Protocol::serializeDeleteRequest(const DeleteRequestData &data)
+{
+    FileProtocolEncodeResult result;
+
+    if (!isValidLogicalPathField(data.path))
+    {
+        result.errorMessage = QStringLiteral("Delete request has an invalid path.");
+        return result;
+    }
+
+    QJsonObject object;
+    object.insert(QStringLiteral("path"), data.path);
+
+    result.payload = QJsonDocument(object).toJson(QJsonDocument::Compact);
+    result.status = FileProtocolEncodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::DeleteRequestDecodeResult MiniCloud::Protocol::deserializeDeleteRequest(const QByteArray &payload)
+{
+    DeleteRequestDecodeResult result;
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+
+    if (parseError.error != QJsonParseError::NoError)
+    {
+        result.errorMessage = parseError.errorString();
+        return result;
+    }
+
+    if (!document.isObject())
+    {
+        result.errorMessage = QStringLiteral("Delete request payload must be a JSON object.");
+        return result;
+    }
+
+    const QJsonValue pathValue = document.object().value(QStringLiteral("path"));
+
+    if (!pathValue.isString())
+    {
+        result.errorMessage = QStringLiteral("Delete request JSON has a missing or invalid path.");
+        return result;
+    }
+
+    const QString path = pathValue.toString();
+
+    if (!isValidLogicalPathField(path))
+    {
+        result.errorMessage = QStringLiteral("Delete request JSON has a missing or invalid path.");
+        return result;
+    }
+
+    DeleteRequestData candidate;
+    candidate.path = path;
+
+    result.data = candidate;
+    result.status = DeleteRequestDecodeResult::Status::Success;
+    return result;
+}
