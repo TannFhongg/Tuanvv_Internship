@@ -12,6 +12,10 @@ add_executable(AuthenticationCodecTests
     authenticationcodectest.cpp
 )
 
+add_executable(FileProtocolCodecTests
+    fileprotocolcodectest.cpp
+)
+
 target_link_libraries(ProtocolCommonTests
     PRIVATE
     ProtocolCommon
@@ -30,6 +34,12 @@ target_link_libraries(ErrorResponseCodecTests
 )
 
 target_link_libraries(AuthenticationCodecTests
+    PRIVATE
+    ProtocolCommon
+    Qt6::Test
+)
+
+target_link_libraries(FileProtocolCodecTests
     PRIVATE
     ProtocolCommon
     Qt6::Test
@@ -201,3 +211,68 @@ add_test(
 add_test(
     NAME AuthenticationCodecTests.authenticateResponse_extraFields_areIgnored
     COMMAND AuthenticationCodecTests authenticateResponse_extraFields_areIgnored)
+
+add_test(
+    NAME FileProtocolCodecTests
+    COMMAND FileProtocolCodecTests
+)
+
+add_test(
+    NAME FileProtocolCodecTest.browseRequest_rootPath_roundTripsThroughFrame
+    COMMAND FileProtocolCodecTests
+            browseRequest_rootPath_roundTripsThroughFrame
+)
+
+add_test(
+    NAME FileProtocolCodecTest.browseRequest_pathLengthLimit_isMeasuredInUtf8Bytes
+    COMMAND FileProtocolCodecTests
+            browseRequest_pathLengthLimit_isMeasuredInUtf8Bytes
+)
+
+add_test(
+    NAME FileProtocolCodecTest.browseRequest_invalidPayload_deserializeFailsWithoutData
+    COMMAND FileProtocolCodecTests
+            browseRequest_invalidPayload_deserializeFailsWithoutData
+)
+
+add_test(
+    NAME FileProtocolCodecTest.browseResponse_multipleEntries_roundTripsAllMetadataAndPreservesOrder
+    COMMAND FileProtocolCodecTests
+            browseResponse_multipleEntries_roundTripsAllMetadataAndPreservesOrder
+)
+
+add_test(
+    NAME FileProtocolCodecTest.browseResponse_invalidPayload_failsWithoutPartialData
+    COMMAND FileProtocolCodecTests
+            browseResponse_invalidPayload_failsWithoutPartialData
+)
+
+add_test(
+    NAME FileProtocolCodecTest.browsePayload_extraFields_areIgnored
+    COMMAND FileProtocolCodecTests
+            browsePayload_extraFields_areIgnored
+)
+
+add_test(
+    NAME FileProtocolCodecTest.createDirectoryContract_validData_roundTripsRequestAndResponse
+    COMMAND FileProtocolCodecTests
+            createDirectoryContract_validData_roundTripsRequestAndResponse
+)
+
+add_test(
+    NAME FileProtocolCodecTest.createDirectoryRequest_fieldLimits_areEnforcedByEncoder
+    COMMAND FileProtocolCodecTests
+            createDirectoryRequest_fieldLimits_areEnforcedByEncoder
+)
+
+add_test(
+    NAME FileProtocolCodecTest.createDirectoryRequest_invalidPayload_failsWithoutPartialData
+    COMMAND FileProtocolCodecTests
+            createDirectoryRequest_invalidPayload_failsWithoutPartialData
+)
+
+add_test(
+    NAME FileProtocolCodecTest.fileOperationResponse_pathValidationAndExtraFields_followContract
+    COMMAND FileProtocolCodecTests
+            fileOperationResponse_pathValidationAndExtraFields_followContract
+)
