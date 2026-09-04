@@ -30,6 +30,25 @@ namespace MiniCloud::Protocol
         QString errorMessage;
     };
 
+    struct FileChunkData
+    {
+        quint64 offset = 0;
+        QByteArray bytes;
+    };
+
+    struct FileChunkDecodeResult
+    {
+        enum class Status
+        {
+            Success,
+            Failed
+        };
+
+        Status status = Status::Failed;
+        FileChunkData data;
+        QString errorMessage;
+    };
+
     struct BrowseRequestDecodeResult
     {
         enum class Status
@@ -235,6 +254,9 @@ namespace MiniCloud::Protocol
 
     FileProtocolEncodeResult serializeDeleteRequest(const DeleteRequestData &data);
     DeleteRequestDecodeResult deserializeDeleteRequest(const QByteArray &payload);
+    
+    FileProtocolEncodeResult serializeFileChunk(const FileChunkData &data);
+    FileChunkDecodeResult deserializeFileChunk(const QByteArray &payload);
 }
 
 Q_DECLARE_METATYPE(MiniCloud::Protocol::FileEntryType)

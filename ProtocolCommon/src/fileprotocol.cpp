@@ -1,5 +1,8 @@
 #include "fileprotocol.h"
+#include "protocolconstants.h"
 
+#include <QDataStream>
+#include <QIODevice>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -753,5 +756,67 @@ MiniCloud::Protocol::DeleteRequestDecodeResult MiniCloud::Protocol::deserializeD
 
     result.data = candidate;
     result.status = DeleteRequestDecodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::FileProtocolEncodeResult MiniCloud::Protocol::serializeFileChunk(const FileChunkData &data)
+{
+    FileProtocolEncodeResult result;
+
+    if (data.bytes.isEmpty() || data.bytes.size() > static_cast<qsizetype>(protocolMaxFileChunkDataBytes))
+    {
+        result.errorMessage = QStringLiteral("File chunk data must be non-empty and within the maximum size.");
+        return result;
+    }
+
+    QDataStream stream(&result.payload, QIODevice::WriteOnly);
+    stream.setByteOrder(QDataStream::BigEndian);
+    stream.setVersion(QDataStream::Qt_6_0);
+    stream << data.offset;
+
+    const int written = stream.writeRawData(data.bytes.constData(), static_cast<int>(data.bytes.size()));
+
+    if (stream.status() != QDataStream::Ok || written != static_cast<int>(data.bytes.size()))
+    {
+        result.payload.clear();
+        result.errorMessage = QStringLiteral("Failed to serialize file chunk data.");
+        return result;
+    }
+
+    result.status = FileProtocolEncodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::FileChunkDecodeResult MiniCloud::Protocol::deserializeFileChunk(const QByteArray &payload)
+{
+    FileChunkDecodeResult result;
+
+    const qsizetype offsetSize = static_cast<qsizetype>(sizeof(quint64));
+
+    if (payload.size() <= offsetSize || payload.size() - offsetSize > static_cast<qsizetype>(protocolMaxFileChunkDataBytes))
+    {
+        result.errorMessage = QStringLiteral("File chunk payload has an invalid size.");
+        return result;
+    }
+
+    QDataStream stream(payload);
+    stream.setByteOrder(QDataStream::BigEndian);
+    stream.setVersion(QDataStream::Qt_6_0);
+
+    quint64 offset = 0;
+    stream >> offset;
+
+    if (stream.status() != QDataStream::Ok)
+    {
+        result.errorMessage = QStringLiteral("Failed to deserialize file chunk offset.");
+        return result;
+    }
+
+    FileChunkData candidate;
+    candidate.offset = offset;
+    candidate.bytes = payload.mid(offsetSize);
+
+    result.data = candidate;
+    result.status = FileChunkDecodeResult::Status::Success;
     return result;
 }
