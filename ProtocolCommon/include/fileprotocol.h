@@ -228,6 +228,81 @@ namespace MiniCloud::Protocol
         QString errorMessage;
     };
 
+    struct UploadStartRequestData
+    {
+        QString destinationDirectoryPath;
+        QString fileName;
+        quint64 totalSizeBytes = 0;
+    };
+
+    struct UploadReadyResponseData
+    {
+        QString path;
+    };
+
+    struct DownloadRequestData
+    {
+        QString path;
+    };
+
+    struct DownloadStartResponseData
+    {
+        QString path;
+        quint64 totalSizeBytes = 0;
+    };
+
+    struct UploadStartRequestDecodeResult
+    {
+        enum class Status
+        {
+            Success,
+            Failed
+        };
+
+        Status status = Status::Failed;
+        UploadStartRequestData data;
+        QString errorMessage;
+    };
+
+    struct UploadReadyResponseDecodeResult
+    {
+        enum class Status
+        {
+            Success,
+            Failed
+        };
+
+        Status status = Status::Failed;
+        UploadReadyResponseData data;
+        QString errorMessage;
+    };
+
+    struct DownloadRequestDecodeResult
+    {
+        enum class Status
+        {
+            Success,
+            Failed
+        };
+
+        Status status = Status::Failed;
+        DownloadRequestData data;
+        QString errorMessage;
+    };
+
+    struct DownloadStartResponseDecodeResult
+    {
+        enum class Status
+        {
+            Success,
+            Failed
+        };
+
+        Status status = Status::Failed;
+        DownloadStartResponseData data;
+        QString errorMessage;
+    };
+
     FileProtocolEncodeResult serializeBrowseRequest(const BrowseRequestData &data);
     BrowseRequestDecodeResult deserializeBrowseRequest(const QByteArray &payload);
 
@@ -254,9 +329,21 @@ namespace MiniCloud::Protocol
 
     FileProtocolEncodeResult serializeDeleteRequest(const DeleteRequestData &data);
     DeleteRequestDecodeResult deserializeDeleteRequest(const QByteArray &payload);
-    
+
     FileProtocolEncodeResult serializeFileChunk(const FileChunkData &data);
     FileChunkDecodeResult deserializeFileChunk(const QByteArray &payload);
+
+    FileProtocolEncodeResult serializeUploadStartRequest(const UploadStartRequestData &data);
+    UploadStartRequestDecodeResult deserializeUploadStartRequest(const QByteArray &payload);
+
+    FileProtocolEncodeResult serializeUploadReadyResponse(const UploadReadyResponseData &data);
+    UploadReadyResponseDecodeResult deserializeUploadReadyResponse(const QByteArray &payload);
+
+    FileProtocolEncodeResult serializeDownloadRequest(const DownloadRequestData &data);
+    DownloadRequestDecodeResult deserializeDownloadRequest(const QByteArray &payload);
+
+    FileProtocolEncodeResult serializeDownloadStartResponse(const DownloadStartResponseData &data);
+    DownloadStartResponseDecodeResult deserializeDownloadStartResponse(const QByteArray &payload);
 }
 
 Q_DECLARE_METATYPE(MiniCloud::Protocol::FileEntryType)

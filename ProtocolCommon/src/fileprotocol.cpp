@@ -759,6 +759,248 @@ MiniCloud::Protocol::DeleteRequestDecodeResult MiniCloud::Protocol::deserializeD
     return result;
 }
 
+MiniCloud::Protocol::FileProtocolEncodeResult MiniCloud::Protocol::serializeUploadStartRequest(const UploadStartRequestData &data)
+{
+    FileProtocolEncodeResult result;
+
+    if (!isValidLogicalPathField(data.destinationDirectoryPath) || !isValidFileNameField(data.fileName))
+    {
+        result.errorMessage = QStringLiteral("Upload start request has an invalid destination path or file name.");
+        return result;
+    }
+
+    QJsonObject object;
+    object.insert(QStringLiteral("destinationDirectoryPath"), data.destinationDirectoryPath);
+    object.insert(QStringLiteral("fileName"), data.fileName);
+    object.insert(QStringLiteral("totalSizeBytes"), QString::number(data.totalSizeBytes));
+
+    result.payload = QJsonDocument(object).toJson(QJsonDocument::Compact);
+    result.status = FileProtocolEncodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::UploadStartRequestDecodeResult MiniCloud::Protocol::deserializeUploadStartRequest(const QByteArray &payload)
+{
+    UploadStartRequestDecodeResult result;
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+
+    if (parseError.error != QJsonParseError::NoError)
+    {
+        result.errorMessage = parseError.errorString();
+        return result;
+    }
+
+    if (!document.isObject())
+    {
+        result.errorMessage = QStringLiteral("Upload start request payload must be a JSON object.");
+        return result;
+    }
+
+    const QJsonObject object = document.object();
+    const QJsonValue destinationDirectoryPathValue = object.value(QStringLiteral("destinationDirectoryPath"));
+    const QJsonValue fileNameValue = object.value(QStringLiteral("fileName"));
+    const QJsonValue totalSizeBytesValue = object.value(QStringLiteral("totalSizeBytes"));
+
+    if (!destinationDirectoryPathValue.isString() || !fileNameValue.isString())
+    {
+        result.errorMessage = QStringLiteral("Upload start request JSON has missing or invalid fields.");
+        return result;
+    }
+
+    const QString destinationDirectoryPath = destinationDirectoryPathValue.toString();
+    const QString fileName = fileNameValue.toString();
+    quint64 totalSizeBytes = 0;
+
+    if (!isValidLogicalPathField(destinationDirectoryPath) || !isValidFileNameField(fileName) || !parseUnsignedDecimal(totalSizeBytesValue, totalSizeBytes))
+    {
+        result.errorMessage = QStringLiteral("Upload start request JSON has missing or invalid fields.");
+        return result;
+    }
+
+    UploadStartRequestData candidate;
+    candidate.destinationDirectoryPath = destinationDirectoryPath;
+    candidate.fileName = fileName;
+    candidate.totalSizeBytes = totalSizeBytes;
+
+    result.data = candidate;
+    result.status = UploadStartRequestDecodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::FileProtocolEncodeResult MiniCloud::Protocol::serializeUploadReadyResponse(const UploadReadyResponseData &data)
+{
+    FileProtocolEncodeResult result;
+
+    if (!isValidLogicalPathField(data.path))
+    {
+        result.errorMessage = QStringLiteral("Upload ready response has an invalid path.");
+        return result;
+    }
+
+    QJsonObject object;
+    object.insert(QStringLiteral("path"), data.path);
+
+    result.payload = QJsonDocument(object).toJson(QJsonDocument::Compact);
+    result.status = FileProtocolEncodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::UploadReadyResponseDecodeResult MiniCloud::Protocol::deserializeUploadReadyResponse(const QByteArray &payload)
+{
+    UploadReadyResponseDecodeResult result;
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+
+    if (parseError.error != QJsonParseError::NoError)
+    {
+        result.errorMessage = parseError.errorString();
+        return result;
+    }
+
+    if (!document.isObject())
+    {
+        result.errorMessage = QStringLiteral("Upload ready response payload must be a JSON object.");
+        return result;
+    }
+
+    const QJsonValue pathValue = document.object().value(QStringLiteral("path"));
+
+    if (!pathValue.isString() || !isValidLogicalPathField(pathValue.toString()))
+    {
+        result.errorMessage = QStringLiteral("Upload ready response JSON has a missing or invalid path.");
+        return result;
+    }
+
+    UploadReadyResponseData candidate;
+    candidate.path = pathValue.toString();
+
+    result.data = candidate;
+    result.status = UploadReadyResponseDecodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::FileProtocolEncodeResult MiniCloud::Protocol::serializeDownloadRequest(const DownloadRequestData &data)
+{
+    FileProtocolEncodeResult result;
+
+    if (!isValidLogicalPathField(data.path))
+    {
+        result.errorMessage = QStringLiteral("Download request has an invalid path.");
+        return result;
+    }
+
+    QJsonObject object;
+    object.insert(QStringLiteral("path"), data.path);
+
+    result.payload = QJsonDocument(object).toJson(QJsonDocument::Compact);
+    result.status = FileProtocolEncodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::DownloadRequestDecodeResult MiniCloud::Protocol::deserializeDownloadRequest(const QByteArray &payload)
+{
+    DownloadRequestDecodeResult result;
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+
+    if (parseError.error != QJsonParseError::NoError)
+    {
+        result.errorMessage = parseError.errorString();
+        return result;
+    }
+
+    if (!document.isObject())
+    {
+        result.errorMessage = QStringLiteral("Download request payload must be a JSON object.");
+        return result;
+    }
+
+    const QJsonValue pathValue = document.object().value(QStringLiteral("path"));
+
+    if (!pathValue.isString() || !isValidLogicalPathField(pathValue.toString()))
+    {
+        result.errorMessage = QStringLiteral("Download request JSON has a missing or invalid path.");
+        return result;
+    }
+
+    DownloadRequestData candidate;
+    candidate.path = pathValue.toString();
+
+    result.data = candidate;
+    result.status = DownloadRequestDecodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::FileProtocolEncodeResult MiniCloud::Protocol::serializeDownloadStartResponse(const DownloadStartResponseData &data)
+{
+    FileProtocolEncodeResult result;
+
+    if (!isValidLogicalPathField(data.path))
+    {
+        result.errorMessage = QStringLiteral("Download start response has an invalid path.");
+        return result;
+    }
+
+    QJsonObject object;
+    object.insert(QStringLiteral("path"), data.path);
+    object.insert(QStringLiteral("totalSizeBytes"), QString::number(data.totalSizeBytes));
+
+    result.payload = QJsonDocument(object).toJson(QJsonDocument::Compact);
+    result.status = FileProtocolEncodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::DownloadStartResponseDecodeResult MiniCloud::Protocol::deserializeDownloadStartResponse(const QByteArray &payload)
+{
+    DownloadStartResponseDecodeResult result;
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+
+    if (parseError.error != QJsonParseError::NoError)
+    {
+        result.errorMessage = parseError.errorString();
+        return result;
+    }
+
+    if (!document.isObject())
+    {
+        result.errorMessage = QStringLiteral("Download start response payload must be a JSON object.");
+        return result;
+    }
+
+    const QJsonObject object = document.object();
+    const QJsonValue pathValue = object.value(QStringLiteral("path"));
+    const QJsonValue totalSizeBytesValue = object.value(QStringLiteral("totalSizeBytes"));
+
+    if (!pathValue.isString())
+    {
+        result.errorMessage = QStringLiteral("Download start response JSON has missing or invalid fields.");
+        return result;
+    }
+
+    const QString path = pathValue.toString();
+    quint64 totalSizeBytes = 0;
+
+    if (!isValidLogicalPathField(path) || !parseUnsignedDecimal(totalSizeBytesValue, totalSizeBytes))
+    {
+        result.errorMessage = QStringLiteral("Download start response JSON has missing or invalid fields.");
+        return result;
+    }
+
+    DownloadStartResponseData candidate;
+    candidate.path = path;
+    candidate.totalSizeBytes = totalSizeBytes;
+
+    result.data = candidate;
+    result.status = DownloadStartResponseDecodeResult::Status::Success;
+    return result;
+}
+
 MiniCloud::Protocol::FileProtocolEncodeResult MiniCloud::Protocol::serializeFileChunk(const FileChunkData &data)
 {
     FileProtocolEncodeResult result;
