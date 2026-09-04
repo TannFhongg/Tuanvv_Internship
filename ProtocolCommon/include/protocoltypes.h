@@ -26,7 +26,12 @@ namespace MiniCloud::Protocol
 
         RenameRequest = 11,
         MoveRequest = 12,
-        DeleteRequest = 13
+        DeleteRequest = 13,
+
+        UploadStartRequest = 14,
+        UploadReadyResponse = 15,
+        DownloadRequest = 16,
+        DownloadStartResponse = 17
     };
 
     enum class ErrorCode : quint16
