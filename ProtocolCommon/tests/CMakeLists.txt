@@ -324,3 +324,21 @@ add_test(
     COMMAND FileProtocolCodecTests
             fileOperationRequestPayloads_extraFields_areIgnored
 )
+
+add_test(
+    NAME FileProtocolCodecTest.fileChunk_binaryPayload_roundTripsWithOffsetAndBoundarySizes
+    COMMAND FileProtocolCodecTests
+            fileChunk_binaryPayload_roundTripsWithOffsetAndBoundarySizes
+)
+
+add_test(
+    NAME FileProtocolCodecTest.fileChunk_invalidPayload_failsWithoutPartialData
+    COMMAND FileProtocolCodecTests
+            fileChunk_invalidPayload_failsWithoutPartialData
+)
+
+add_test(
+    NAME FileProtocolCodecTest.fileChunk_encoder_rejectsEmptyAndOversizeData
+    COMMAND FileProtocolCodecTests
+            fileChunk_encoder_rejectsEmptyAndOversizeData
+)

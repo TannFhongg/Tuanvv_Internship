@@ -1,5 +1,7 @@
 #include <QtTest/QTest>
 
+#include <QDataStream>
+#include <QIODevice>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -7,6 +9,7 @@
 #include "fileprotocol.h"
 #include "frameparser.h"
 #include "protocolcodec.h"
+#include "protocolconstants.h"
 #include "protocoltypes.h"
 
 namespace
@@ -17,6 +20,18 @@ namespace
         Move,
         Delete
     };
+
+    QByteArray makeRawChunkPayload(quint64 offset, const QByteArray &bytes)
+    {
+        QByteArray payload;
+        QDataStream stream(&payload, QIODevice::WriteOnly);
+        stream.setByteOrder(QDataStream::BigEndian);
+        stream.setVersion(QDataStream::Qt_6_0);
+        stream << offset;
+
+        payload.append(bytes);
+        return payload;
+    }
 }
 
 class FileProtocolCodecTest : public QObject
@@ -1017,6 +1032,100 @@ private slots:
         QCOMPARE(deleteResult.status, DeleteRequestDecodeResult::Status::Success);
         QVERIFY(deleteResult.errorMessage.isEmpty());
         QCOMPARE(deleteResult.data.path, QStringLiteral("/Archive/new.txt"));
+    }
+
+    void fileChunk_binaryPayload_roundTripsWithOffsetAndBoundarySizes_data()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QTest::addColumn<quint64>("offset");
+        QTest::addColumn<QByteArray>("bytes");
+
+        QTest::newRow("empty-offset-data") << quint64{0} << QByteArrayLiteral("hello");
+        QTest::newRow("non-zero-offset-data") << quint64{65536} << QByteArrayLiteral("\x01\0\xFF\x7F");
+        QTest::newRow("exact-64-kib-data") << quint64{131072} << QByteArray(static_cast<qsizetype>(protocolMaxFileChunkDataBytes), '\xA5');
+    }
+
+    void fileChunk_binaryPayload_roundTripsWithOffsetAndBoundarySizes()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QFETCH(quint64, offset);
+        QFETCH(QByteArray, bytes);
+
+        const FileChunkData data{offset, bytes};
+
+        const FileProtocolEncodeResult encoded = serializeFileChunk(data);
+
+        QCOMPARE(encoded.status, FileProtocolEncodeResult::Status::Success);
+        constexpr RequestId requestId = 401;
+
+        const FrameEncodeResult encodedFrame = serializeFrame(
+            MessageType::FileChunk,
+            requestId,
+            TaskId{0},
+            encoded.payload);
+        QCOMPARE(encodedFrame.status, FrameEncodeStatus::Success);
+        FrameParser parser;
+        parser.appendData(encodedFrame.encodedFrame);
+        const FrameParser::FrameParseResult parsed = parser.tryTakeFrame();
+        QCOMPARE(parsed.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(parsed.frame.header.messageType, MessageType::FileChunk);
+        QCOMPARE(parsed.frame.header.requestId, requestId);
+        QCOMPARE(parsed.frame.header.taskId, TaskId{0});
+
+        const FileChunkDecodeResult decoded = deserializeFileChunk(parsed.frame.payload);
+        QCOMPARE(decoded.status, FileChunkDecodeResult::Status::Success);
+        QCOMPARE(decoded.data.offset, data.offset);
+        QCOMPARE(decoded.data.bytes, data.bytes);
+    }
+
+    void fileChunk_invalidPayload_failsWithoutPartialData_data()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QTest::addColumn<QByteArray>("payload");
+
+        QTest::newRow("missing-offset-byte") << QByteArray(7, '\0');
+        QTest::newRow("empty-chunk-data") << makeRawChunkPayload(42, QByteArray());
+        QTest::newRow("chunk-data-over-64-kib") << makeRawChunkPayload(42, QByteArray(static_cast<qsizetype>(protocolMaxFileChunkDataBytes) + 1, 'x'));
+    }
+
+    void fileChunk_invalidPayload_failsWithoutPartialData()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QFETCH(QByteArray, payload);
+
+        const FileChunkDecodeResult result = deserializeFileChunk(payload);
+        QCOMPARE(result.status, FileChunkDecodeResult::Status::Failed);
+        QVERIFY(!result.errorMessage.isEmpty());
+        QCOMPARE(result.data.offset, quint64{0});
+        QVERIFY(result.data.bytes.isEmpty());
+    }
+
+    void fileChunk_encoder_rejectsEmptyAndOversizeData_data()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QTest::addColumn<QByteArray>("bytes");
+
+        QTest::newRow("empty-data") << QByteArray();
+
+        QTest::newRow("data-over-64-kib") << QByteArray(static_cast<qsizetype>(protocolMaxFileChunkDataBytes) + 1, 'x');
+    }
+
+    void fileChunk_encoder_rejectsEmptyAndOversizeData()
+    {
+        using namespace MiniCloud::Protocol;
+
+        QFETCH(QByteArray, bytes);
+
+        const FileProtocolEncodeResult result = serializeFileChunk(FileChunkData{42, bytes});
+
+        QCOMPARE(result.status, FileProtocolEncodeResult::Status::Failed);
+        QVERIFY(!result.errorMessage.isEmpty());
+        QVERIFY(result.payload.isEmpty());
     }
 };
 
