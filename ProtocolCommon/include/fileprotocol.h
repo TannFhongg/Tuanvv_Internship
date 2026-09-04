@@ -10,6 +10,7 @@ namespace MiniCloud::Protocol
 {
     inline constexpr qsizetype protocolMaxLogicalPathUtf8Bytes = 1024;
     inline constexpr qsizetype protocolMaxFileNameUtf8Bytes = 255;
+    inline constexpr qsizetype protocolMaxSearchQueryUtf8Bytes = 255;
 
     struct BrowseRequestData
     {
@@ -114,6 +115,44 @@ namespace MiniCloud::Protocol
         QString errorMessage;
     };
 
+    struct SearchRequestData
+    {
+        QString path;
+        QString query;
+    };
+
+    struct SearchResponseData
+    {
+        QString path;
+        QList<FileEntryData> entries;
+    };
+
+    struct SearchRequestDecodeResult
+    {
+        enum class Status
+        {
+            Success,
+            Failed
+        };
+
+        Status status = Status::Failed;
+        SearchRequestData data;
+        QString errorMessage;
+    };
+
+    struct SearchResponseDecodeResult
+    {
+        enum class Status
+        {
+            Success,
+            Failed
+        };
+
+        Status status = Status::Failed;
+        SearchResponseData data;
+        QString errorMessage;
+    };
+
     FileProtocolEncodeResult serializeBrowseRequest(const BrowseRequestData &data);
 
     BrowseRequestDecodeResult deserializeBrowseRequest(const QByteArray &payload);
@@ -129,6 +168,14 @@ namespace MiniCloud::Protocol
     FileProtocolEncodeResult serializeBrowseResponse(const BrowseResponseData &data);
 
     BrowseResponseDecodeResult deserializeBrowseResponse(const QByteArray &payload);
+
+    FileProtocolEncodeResult serializeSearchRequest(const SearchRequestData &data);
+
+    SearchRequestDecodeResult deserializeSearchRequest(const QByteArray &payload);
+
+    FileProtocolEncodeResult serializeSearchResponse(const SearchResponseData &data);
+
+    SearchResponseDecodeResult deserializeSearchResponse(const QByteArray &payload);
 }
 
 Q_DECLARE_METATYPE(MiniCloud::Protocol::FileEntryType)

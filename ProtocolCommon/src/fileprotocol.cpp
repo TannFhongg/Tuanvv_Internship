@@ -23,10 +23,14 @@ namespace
         return isNonBlankString(name) && name.toUtf8().size() <= MiniCloud::Protocol::protocolMaxFileNameUtf8Bytes;
     }
 
+    bool isValidSearchQueryField(const QString &query)
+    {
+        return isNonBlankString(query) && query.toUtf8().size() <= MiniCloud::Protocol::protocolMaxSearchQueryUtf8Bytes;
+    }
+
     bool isValidFileEntryType(MiniCloud::Protocol::FileEntryType type)
     {
         using MiniCloud::Protocol::FileEntryType;
-
         return type == FileEntryType::File || type == FileEntryType::Directory;
     }
 
@@ -55,6 +59,78 @@ namespace
         }
 
         output = parsed;
+        return true;
+    }
+
+    bool tryEncodeFileEntry(const MiniCloud::Protocol::FileEntryData &entry, QJsonObject &object)
+    {
+        if (entry.name.isEmpty() || entry.path.isEmpty() || !isValidFileEntryType(entry.type))
+        {
+            return false;
+        }
+
+        object.insert(QStringLiteral("name"), entry.name);
+        object.insert(QStringLiteral("path"), entry.path);
+        object.insert(QStringLiteral("type"), static_cast<quint16>(entry.type));
+        object.insert(QStringLiteral("sizeBytes"), QString::number(entry.sizeBytes));
+        object.insert(QStringLiteral("lastModifiedUtcMs"), QString::number(entry.lastModifiedUtcMs));
+        return true;
+    }
+
+    bool tryDecodeFileEntry(const QJsonValue &entryValue, MiniCloud::Protocol::FileEntryData &entry)
+    {
+        using MiniCloud::Protocol::FileEntryData;
+        using MiniCloud::Protocol::FileEntryType;
+
+        if (!entryValue.isObject())
+        {
+            return false;
+        }
+
+        const QJsonObject object = entryValue.toObject();
+        const QJsonValue nameValue = object.value(QStringLiteral("name"));
+        const QJsonValue pathValue = object.value(QStringLiteral("path"));
+        const QJsonValue typeValue = object.value(QStringLiteral("type"));
+        const QJsonValue sizeBytesValue = object.value(QStringLiteral("sizeBytes"));
+        const QJsonValue lastModifiedUtcMsValue = object.value(QStringLiteral("lastModifiedUtcMs"));
+
+        if (!nameValue.isString() || nameValue.toString().isEmpty() || !pathValue.isString() || pathValue.toString().isEmpty() || !typeValue.isDouble())
+        {
+            return false;
+        }
+
+        const double rawType = typeValue.toDouble();
+        FileEntryType type = FileEntryType::Invalid;
+
+        if (rawType == static_cast<double>(static_cast<quint16>(FileEntryType::File)))
+        {
+            type = FileEntryType::File;
+        }
+        else if (rawType == static_cast<double>(static_cast<quint16>(FileEntryType::Directory)))
+        {
+            type = FileEntryType::Directory;
+        }
+        else
+        {
+            return false;
+        }
+
+        quint64 sizeBytes = 0;
+        quint64 lastModifiedUtcMs = 0;
+
+        if (!parseUnsignedDecimal(sizeBytesValue, sizeBytes) || !parseUnsignedDecimal(lastModifiedUtcMsValue, lastModifiedUtcMs))
+        {
+            return false;
+        }
+
+        FileEntryData candidate;
+        candidate.name = nameValue.toString();
+        candidate.path = pathValue.toString();
+        candidate.type = type;
+        candidate.sizeBytes = sizeBytes;
+        candidate.lastModifiedUtcMs = lastModifiedUtcMs;
+
+        entry = candidate;
         return true;
     }
 }
@@ -255,25 +331,15 @@ MiniCloud::Protocol::FileProtocolEncodeResult MiniCloud::Protocol::serializeBrow
 
     for (const FileEntryData &entry : data.entries)
     {
-        if (entry.name.isEmpty() || entry.path.isEmpty())
+        QJsonObject entryObject;
+
+        if (!tryEncodeFileEntry(entry, entryObject))
         {
-            result.errorMessage = QStringLiteral("Browse response entries require non-empty names and paths.");
+            result.errorMessage = QStringLiteral("Browse response contains an invalid file entry.");
             return result;
         }
 
-        if (!isValidFileEntryType(entry.type))
-        {
-            result.errorMessage = QStringLiteral("Browse response contains an invalid file entry type.");
-            return result;
-        }
-
-        QJsonObject object;
-        object.insert(QStringLiteral("name"), entry.name);
-        object.insert(QStringLiteral("path"), entry.path);
-        object.insert(QStringLiteral("type"), static_cast<quint16>(entry.type));
-        object.insert(QStringLiteral("sizeBytes"), QString::number(entry.sizeBytes));
-        object.insert(QStringLiteral("lastModifiedUtcMs"), QString::number(entry.lastModifiedUtcMs));
-        entries.append(object);
+        entries.append(entryObject);
     }
 
     QJsonObject object;
@@ -325,62 +391,174 @@ MiniCloud::Protocol::BrowseResponseDecodeResult MiniCloud::Protocol::deserialize
 
     for (const QJsonValue &entryValue : entriesValue.toArray())
     {
-        if (!entryValue.isObject())
+        FileEntryData entry;
+
+        if (!tryDecodeFileEntry(entryValue, entry))
         {
             result.errorMessage = QStringLiteral("Browse response JSON contains an invalid entry.");
             return result;
         }
-
-        const QJsonObject entryObject = entryValue.toObject();
-        const QJsonValue nameValue = entryObject.value(QStringLiteral("name"));
-        const QJsonValue entryPathValue = entryObject.value(QStringLiteral("path"));
-        const QJsonValue typeValue = entryObject.value(QStringLiteral("type"));
-        const QJsonValue sizeBytesValue = entryObject.value(QStringLiteral("sizeBytes"));
-        const QJsonValue lastModifiedUtcMsValue = entryObject.value(QStringLiteral("lastModifiedUtcMs"));
-
-        if (!nameValue.isString() || nameValue.toString().isEmpty() || !entryPathValue.isString() || entryPathValue.toString().isEmpty() || !typeValue.isDouble())
-        {
-            result.errorMessage = QStringLiteral("Browse response JSON contains an entry with missing or invalid fields.");
-            return result;
-        }
-
-        const double rawType = typeValue.toDouble();
-        FileEntryType type = FileEntryType::Invalid;
-
-        if (rawType == static_cast<double>(static_cast<quint16>(FileEntryType::File)))
-        {
-            type = FileEntryType::File;
-        }
-        else if (rawType == static_cast<double>(static_cast<quint16>(FileEntryType::Directory)))
-        {
-            type = FileEntryType::Directory;
-        }
-        else
-        {
-            result.errorMessage = QStringLiteral("Browse response JSON contains an invalid file entry type.");
-            return result;
-        }
-
-        quint64 sizeBytes = 0;
-        quint64 lastModifiedUtcMs = 0;
-
-        if (!parseUnsignedDecimal(sizeBytesValue, sizeBytes) || !parseUnsignedDecimal(lastModifiedUtcMsValue, lastModifiedUtcMs))
-        {
-            result.errorMessage = QStringLiteral("Browse response JSON contains invalid unsigned integer metadata.");
-            return result;
-        }
-
-        FileEntryData entry;
-        entry.name = nameValue.toString();
-        entry.path = entryPathValue.toString();
-        entry.type = type;
-        entry.sizeBytes = sizeBytes;
-        entry.lastModifiedUtcMs = lastModifiedUtcMs;
 
         candidate.entries.append(entry);
     }
 
     result.data = candidate;
     result.status = BrowseResponseDecodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::FileProtocolEncodeResult MiniCloud::Protocol::serializeSearchRequest(const SearchRequestData &data)
+{
+    FileProtocolEncodeResult result;
+
+    if (!isValidLogicalPathField(data.path) || !isValidSearchQueryField(data.query))
+    {
+        result.errorMessage = QStringLiteral("Search request has invalid path or query.");
+        return result;
+    }
+
+    QJsonObject object;
+    object.insert(QStringLiteral("path"), data.path);
+    object.insert(QStringLiteral("query"), data.query);
+
+    result.payload = QJsonDocument(object).toJson(QJsonDocument::Compact);
+    result.status = FileProtocolEncodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::SearchRequestDecodeResult MiniCloud::Protocol::deserializeSearchRequest(const QByteArray &payload)
+{
+    SearchRequestDecodeResult result;
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+
+    if (parseError.error != QJsonParseError::NoError)
+    {
+        result.errorMessage = parseError.errorString();
+        return result;
+    }
+
+    if (!document.isObject())
+    {
+        result.errorMessage = QStringLiteral("Search request payload must be a JSON object.");
+        return result;
+    }
+
+    const QJsonObject object = document.object();
+    const QJsonValue pathValue = object.value(QStringLiteral("path"));
+    const QJsonValue queryValue = object.value(QStringLiteral("query"));
+
+    if (!pathValue.isString() || !queryValue.isString())
+    {
+        result.errorMessage = QStringLiteral("Search request JSON has missing or invalid fields.");
+        return result;
+    }
+
+    const QString path = pathValue.toString();
+    const QString query = queryValue.toString();
+
+    if (!isValidLogicalPathField(path) || !isValidSearchQueryField(query))
+    {
+        result.errorMessage = QStringLiteral("Search request JSON has missing or invalid fields.");
+        return result;
+    }
+
+    SearchRequestData candidate;
+    candidate.path = path;
+    candidate.query = query;
+
+    result.data = candidate;
+    result.status = SearchRequestDecodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::FileProtocolEncodeResult MiniCloud::Protocol::serializeSearchResponse(const SearchResponseData &data)
+{
+    FileProtocolEncodeResult result;
+
+    if (!isValidLogicalPathField(data.path))
+    {
+        result.errorMessage = QStringLiteral("Search response has an invalid path.");
+        return result;
+    }
+
+    QJsonArray entries;
+
+    for (const FileEntryData &entry : data.entries)
+    {
+        QJsonObject entryObject;
+
+        if (!tryEncodeFileEntry(entry, entryObject))
+        {
+            result.errorMessage = QStringLiteral("Search response contains an invalid file entry.");
+            return result;
+        }
+
+        entries.append(entryObject);
+    }
+
+    QJsonObject object;
+    object.insert(QStringLiteral("path"), data.path);
+    object.insert(QStringLiteral("entries"), entries);
+
+    result.payload = QJsonDocument(object).toJson(QJsonDocument::Compact);
+    result.status = FileProtocolEncodeResult::Status::Success;
+    return result;
+}
+
+MiniCloud::Protocol::SearchResponseDecodeResult MiniCloud::Protocol::deserializeSearchResponse(const QByteArray &payload)
+{
+    SearchResponseDecodeResult result;
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+
+    if (parseError.error != QJsonParseError::NoError)
+    {
+        result.errorMessage = parseError.errorString();
+        return result;
+    }
+
+    if (!document.isObject())
+    {
+        result.errorMessage = QStringLiteral("Search response payload must be a JSON object.");
+        return result;
+    }
+
+    const QJsonObject object = document.object();
+    const QJsonValue pathValue = object.value(QStringLiteral("path"));
+    const QJsonValue entriesValue = object.value(QStringLiteral("entries"));
+
+    if (!pathValue.isString() || !isValidLogicalPathField(pathValue.toString()))
+    {
+        result.errorMessage = QStringLiteral("Search response JSON has a missing or invalid path.");
+        return result;
+    }
+
+    if (!entriesValue.isArray())
+    {
+        result.errorMessage = QStringLiteral("Search response JSON has missing or invalid entries.");
+        return result;
+    }
+
+    SearchResponseData candidate;
+    candidate.path = pathValue.toString();
+
+    for (const QJsonValue &entryValue : entriesValue.toArray())
+    {
+        FileEntryData entry;
+
+        if (!tryDecodeFileEntry(entryValue, entry))
+        {
+            result.errorMessage = QStringLiteral("Search response JSON contains an invalid entry.");
+            return result;
+        }
+
+        candidate.entries.append(entry);
+    }
+
+    result.data = candidate;
+    result.status = SearchResponseDecodeResult::Status::Success;
     return result;
 }
