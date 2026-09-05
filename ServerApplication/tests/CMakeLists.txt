@@ -15,6 +15,10 @@ add_executable(LicenseManagerTest
     licensemanagertest.cpp
 )
 
+add_executable(FileManagerTests
+    filemanagertest.cpp
+)
+
 target_link_libraries(LicenseRepositoryTest PRIVATE
     ServerCore
     Qt6::Test
@@ -22,6 +26,12 @@ target_link_libraries(LicenseRepositoryTest PRIVATE
 )
 
 target_link_libraries(LicenseManagerTest PRIVATE
+    ServerCore
+    Qt6::Test
+    Qt6::Core
+)
+
+target_link_libraries(FileManagerTests PRIVATE
     ServerCore
     Qt6::Test
     Qt6::Core
@@ -55,6 +65,72 @@ add_test(
 add_test(
     NAME LicenseRepositoryTest
     COMMAND LicenseRepositoryTest
+)
+
+add_test(
+    NAME FileManagerTest.browseRoot_emptyStorage_returnsEmptyEntries
+    COMMAND FileManagerTests
+            browseRoot_emptyStorage_returnsEmptyEntries
+)
+
+add_test(
+    NAME FileManagerTest.browseRoot_multipleEntries_returnsAllMetadataInDeterministicOrder
+    COMMAND FileManagerTests
+            browseRoot_multipleEntries_returnsAllMetadataInDeterministicOrder
+)
+
+add_test(
+    NAME FileManagerTest.browseNestedDirectory_returnsOnlyDirectChildrenWithLogicalPaths
+    COMMAND FileManagerTests
+            browseNestedDirectory_returnsOnlyDirectChildrenWithLogicalPaths
+)
+
+add_test(
+    NAME FileManagerTest.browsePathTraversal_failsWithoutExposingOutsideStorage
+    COMMAND FileManagerTests
+            browsePathTraversal_failsWithoutExposingOutsideStorage
+)
+
+add_test(
+    NAME FileManagerTest.browseNonCanonicalLogicalPath_failsWithoutMutation
+    COMMAND FileManagerTests
+            browseNonCanonicalLogicalPath_failsWithoutMutation
+)
+
+add_test(
+    NAME FileManagerTest.browseMissingOrFilePath_failsWithoutMutation
+    COMMAND FileManagerTests
+            browseMissingOrFilePath_failsWithoutMutation
+)
+
+add_test(
+    NAME FileManagerTest.createDirectory_underExistingDirectory_createsAndReturnsLogicalPath
+    COMMAND FileManagerTests
+            createDirectory_underExistingDirectory_createsAndReturnsLogicalPath
+)
+
+add_test(
+    NAME FileManagerTest.createDirectory_invalidPathOrName_failsWithoutMutation
+    COMMAND FileManagerTests
+            createDirectory_invalidPathOrName_failsWithoutMutation
+)
+
+add_test(
+    NAME FileManagerTest.createDirectory_atRoot_createsAndReturnsRootChild
+    COMMAND FileManagerTests
+            createDirectory_atRoot_createsAndReturnsRootChild
+)
+
+add_test(
+    NAME FileManagerTest.createDirectory_missingOrFileParent_failsWithoutMutation
+    COMMAND FileManagerTests
+            createDirectory_missingOrFileParent_failsWithoutMutation
+)
+
+add_test(
+    NAME FileManagerTest.createDirectory_existingFileOrDirectory_failsWithoutOverwriting
+    COMMAND FileManagerTests
+            createDirectory_existingFileOrDirectory_failsWithoutOverwriting
 )
 
 add_test(
