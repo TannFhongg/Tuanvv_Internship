@@ -20,6 +20,7 @@ add_library(ServerCore STATIC
     src/ClientSession.cpp
     src/licenserepository.cpp
     src/licensemanager.cpp
+    src/filemanager.cpp
     src/ServerRequestDispatcher.cpp
     src/servercontroller.cpp
 
@@ -28,6 +29,7 @@ add_library(ServerCore STATIC
     include/ClientSession.h
     include/licenserepository.h
     include/licenserecord.h
+    include/filemanager.h
     include/ServerRequestDispatcher.h
     include/servercontroller.h
 )
