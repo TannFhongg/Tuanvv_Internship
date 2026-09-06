@@ -134,6 +134,24 @@ add_test(
 )
 
 add_test(
+    NAME FileManagerTest.searchCurrentDirectory_caseInsensitiveSubstring_returnsSortedDirectMatches
+    COMMAND FileManagerTests
+            searchCurrentDirectory_caseInsensitiveSubstring_returnsSortedDirectMatches
+)
+
+add_test(
+    NAME FileManagerTest.searchNoMatches_returnsSuccessWithEmptyEntries
+    COMMAND FileManagerTests
+            searchNoMatches_returnsSuccessWithEmptyEntries
+)
+
+add_test(
+    NAME FileManagerTest.searchInvalidDirectoryOrQuery_failsWithoutMutation
+    COMMAND FileManagerTests
+            searchInvalidDirectoryOrQuery_failsWithoutMutation
+)
+
+add_test(
     NAME ServerNetworkTests
     COMMAND ServerNetworkTests
 )
