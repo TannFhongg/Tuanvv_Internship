@@ -127,6 +127,36 @@ namespace MiniCloud::Server
         return result;
     }
 
+    FileManagerBrowseResult FileManager::search(const QString &directoryLogicalPath, const QString &query) const
+    {
+        if (query.trimmed().isEmpty())
+        {
+            FileManagerBrowseResult result;
+            result.errorMessage = QStringLiteral("Search query must not be blank.");
+            return result;
+        }
+
+        FileManagerBrowseResult result = browse(directoryLogicalPath);
+
+        if (result.status != FileManagerOperationStatus::Success)
+        {
+            return result;
+        }
+
+        QList<MiniCloud::Protocol::FileEntryData> matchingEntries;
+
+        for (const MiniCloud::Protocol::FileEntryData &entry : result.entries)
+        {
+            if (entry.name.contains(query, Qt::CaseInsensitive))
+            {
+                matchingEntries.append(entry);
+            }
+        }
+
+        result.entries = matchingEntries;
+        return result;
+    }
+
     FileManagerOperationResult FileManager::createDirectory(const QString &parentLogicalPath, const QString &name) const
     {
         FileManagerOperationResult result;

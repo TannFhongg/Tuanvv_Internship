@@ -22,8 +22,7 @@ namespace MiniCloud::Server
 
     struct FileManagerOperationResult
     {
-        FileManagerOperationStatus status =
-            FileManagerOperationStatus::Failed;
+        FileManagerOperationStatus status =FileManagerOperationStatus::Failed;
         QString errorMessage;
         QString path;
     };
@@ -34,6 +33,8 @@ namespace MiniCloud::Server
         explicit FileManager(QString storageRoot);
 
         FileManagerBrowseResult browse(const QString &logicalPath) const;
+
+        FileManagerBrowseResult search(const QString &directoryLogicalPath, const QString &query) const;
 
         FileManagerOperationResult createDirectory(const QString &parentLogicalPath, const QString &name) const;
 
