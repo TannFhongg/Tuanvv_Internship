@@ -134,6 +134,60 @@ add_test(
 )
 
 add_test(
+    NAME FileManagerTest.renameExistingFile_preservesContentAndReturnsNewLogicalPath
+    COMMAND FileManagerTests
+            renameExistingFile_preservesContentAndReturnsNewLogicalPath
+)
+
+add_test(
+    NAME FileManagerTest.renameExistingDirectory_preservesChildrenAndReturnsNewLogicalPath
+    COMMAND FileManagerTests
+            renameExistingDirectory_preservesChildrenAndReturnsNewLogicalPath
+)
+
+add_test(
+    NAME FileManagerTest.renameInvalidSourceOrName_failsWithoutMutation
+    COMMAND FileManagerTests
+            renameInvalidSourceOrName_failsWithoutMutation
+)
+
+add_test(
+    NAME FileManagerTest.renameToExistingFileOrDirectory_failsWithoutOverwriting
+    COMMAND FileManagerTests
+            renameToExistingFileOrDirectory_failsWithoutOverwriting
+)
+
+add_test(
+    NAME FileManagerTest.moveExistingFile_toDifferentDirectory_preservesContentAndReturnsDestinationPath
+    COMMAND FileManagerTests
+            moveExistingFile_toDifferentDirectory_preservesContentAndReturnsDestinationPath
+)
+
+add_test(
+    NAME FileManagerTest.moveExistingDirectory_toDifferentDirectory_preservesDescendantsAndReturnsDestinationPath
+    COMMAND FileManagerTests
+            moveExistingDirectory_toDifferentDirectory_preservesDescendantsAndReturnsDestinationPath
+)
+
+add_test(
+    NAME FileManagerTest.moveInvalidSourceOrDestination_failsWithoutMutation
+    COMMAND FileManagerTests
+            moveInvalidSourceOrDestination_failsWithoutMutation
+)
+
+add_test(
+    NAME FileManagerTest.moveDirectoryIntoOwnDescendant_failsWithoutMutation
+    COMMAND FileManagerTests
+            moveDirectoryIntoOwnDescendant_failsWithoutMutation
+)
+
+add_test(
+    NAME FileManagerTest.moveToDestinationWithSameLeafName_failsWithoutOverwriting
+    COMMAND FileManagerTests
+            moveToDestinationWithSameLeafName_failsWithoutOverwriting
+)
+
+add_test(
     NAME FileManagerTest.searchCurrentDirectory_caseInsensitiveSubstring_returnsSortedDirectMatches
     COMMAND FileManagerTests
             searchCurrentDirectory_caseInsensitiveSubstring_returnsSortedDirectMatches

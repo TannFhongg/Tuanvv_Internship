@@ -634,6 +634,486 @@ private slots:
 
         QVERIFY(QFileInfo::exists(reportFilePath));
     }
+
+    void renameExistingFile_preservesContentAndReturnsNewLogicalPath()
+    {
+        using namespace MiniCloud::Protocol;
+        using namespace MiniCloud::Server;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QDir documentsDirectory(QDir(storageRoot).filePath(QStringLiteral("Documents")));
+        const QString oldNativePath = documentsDirectory.filePath(QStringLiteral("report.txt"));
+        QFile reportFile(oldNativePath);
+        QVERIFY(reportFile.open(QIODevice::WriteOnly));
+        QCOMPARE(reportFile.write("quarterly-data"), qint64{14});
+        reportFile.close();
+
+        FileManager manager(storageRoot);
+
+        const FileManagerOperationResult result = manager.rename(QStringLiteral("/Documents/report.txt"), QStringLiteral("summary.txt"));
+        QCOMPARE(result.status, FileManagerOperationStatus::Success);
+        QVERIFY(result.errorMessage.isEmpty());
+        QCOMPARE(result.path, QStringLiteral("/Documents/summary.txt"));
+
+        const QString newNativePath = documentsDirectory.filePath(QStringLiteral("summary.txt"));
+        QVERIFY(!QFileInfo::exists(oldNativePath));
+        QVERIFY(QFileInfo::exists(newNativePath));
+        QVERIFY(QFileInfo(newNativePath).isFile());
+
+        QFile renamedFile(newNativePath);
+        QVERIFY(renamedFile.open(QIODevice::ReadOnly));
+        QCOMPARE(renamedFile.readAll(), QByteArrayLiteral("quarterly-data"));
+
+        const FileManagerBrowseResult browseResult = manager.browse(QStringLiteral("/Documents"));
+        QCOMPARE(browseResult.status, FileManagerOperationStatus::Success);
+        QCOMPARE(browseResult.entries.size(), 1);
+        QCOMPARE(browseResult.entries.at(0).name, QStringLiteral("summary.txt"));
+        QCOMPARE(browseResult.entries.at(0).path, QStringLiteral("/Documents/summary.txt"));
+        QCOMPARE(browseResult.entries.at(0).type, FileEntryType::File);
+    }
+
+    void renameExistingDirectory_preservesChildrenAndReturnsNewLogicalPath()
+    {
+        using namespace MiniCloud::Protocol;
+        using namespace MiniCloud::Server;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents/Projects"))));
+
+        const QString oldDirectoryPath = QDir(storageRoot).filePath(QStringLiteral("Documents/Projects"));
+        const QString planPath = QDir(oldDirectoryPath).filePath(QStringLiteral("plan.txt"));
+        QFile planFile(planPath);
+        QVERIFY(planFile.open(QIODevice::WriteOnly));
+        QCOMPARE(planFile.write("project-plan"), qint64{12});
+        planFile.close();
+
+        FileManager manager(storageRoot);
+
+        const FileManagerOperationResult result = manager.rename(QStringLiteral("/Documents/Projects"), QStringLiteral("Archive"));
+        QCOMPARE(result.status, FileManagerOperationStatus::Success);
+        QVERIFY(result.errorMessage.isEmpty());
+        QCOMPARE(result.path, QStringLiteral("/Documents/Archive"));
+
+        const QString newDirectoryPath = QDir(storageRoot).filePath(QStringLiteral("Documents/Archive"));
+        const QString renamedPlanPath = QDir(newDirectoryPath).filePath(QStringLiteral("plan.txt"));
+        QVERIFY(!QFileInfo::exists(oldDirectoryPath));
+        QVERIFY(QFileInfo(newDirectoryPath).isDir());
+        QVERIFY(QFileInfo(renamedPlanPath).isFile());
+
+        QFile renamedPlanFile(renamedPlanPath);
+        QVERIFY(renamedPlanFile.open(QIODevice::ReadOnly));
+        QCOMPARE(renamedPlanFile.readAll(), QByteArrayLiteral("project-plan"));
+
+        const FileManagerBrowseResult browseResult = manager.browse(QStringLiteral("/Documents"));
+        QCOMPARE(browseResult.status, FileManagerOperationStatus::Success);
+        QCOMPARE(browseResult.entries.size(), 1);
+        QCOMPARE(browseResult.entries.at(0).name, QStringLiteral("Archive"));
+        QCOMPARE(browseResult.entries.at(0).path, QStringLiteral("/Documents/Archive"));
+        QCOMPARE(browseResult.entries.at(0).type, FileEntryType::Directory);
+    }
+
+    void renameInvalidSourceOrName_failsWithoutMutation_data()
+    {
+        QTest::addColumn<QString>("sourcePath");
+        QTest::addColumn<QString>("newName");
+
+        QTest::newRow("missing-source") << QStringLiteral("/Documents/missing.txt") << QStringLiteral("renamed.txt");
+        QTest::newRow("root-source") << QStringLiteral("/") << QStringLiteral("renamed-root");
+        QTest::newRow("traversal-source") << QStringLiteral("/../outside") << QStringLiteral("renamed.txt");
+        QTest::newRow("blank-new-name") << QStringLiteral("/Documents/report.txt") << QString();
+        QTest::newRow("whitespace-new-name") << QStringLiteral("/Documents/report.txt") << QStringLiteral("   ");
+        QTest::newRow("dot-new-name") << QStringLiteral("/Documents/report.txt") << QStringLiteral(".");
+        QTest::newRow("dotdot-new-name") << QStringLiteral("/Documents/report.txt") << QStringLiteral("..");
+        QTest::newRow("slash-in-new-name") << QStringLiteral("/Documents/report.txt") << QStringLiteral("nested/renamed.txt");
+        QTest::newRow("backslash-in-new-name") << QStringLiteral("/Documents/report.txt") << QStringLiteral("nested\\renamed.txt");
+    }
+
+    void renameInvalidSourceOrName_failsWithoutMutation()
+    {
+        using namespace MiniCloud::Server;
+
+        QFETCH(QString, sourcePath);
+        QFETCH(QString, newName);
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QString reportPath = QDir(storageRoot).filePath(QStringLiteral("Documents/report.txt"));
+        QFile reportFile(reportPath);
+        QVERIFY(reportFile.open(QIODevice::WriteOnly));
+        QCOMPARE(reportFile.write("report-data"), qint64{11});
+        reportFile.close();
+
+        FileManager manager(storageRoot);
+
+        const FileManagerOperationResult result = manager.rename(sourcePath, newName);
+
+        QCOMPARE(result.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!result.errorMessage.isEmpty());
+        QVERIFY(result.path.isEmpty());
+
+        QVERIFY(QFileInfo::exists(reportPath));
+        QVERIFY(QFileInfo(reportPath).isFile());
+
+        QFile unchangedReportFile(reportPath);
+        QVERIFY(unchangedReportFile.open(QIODevice::ReadOnly));
+        QCOMPARE(unchangedReportFile.readAll(), QByteArrayLiteral("report-data"));
+    }
+
+    void renameToExistingFileOrDirectory_failsWithoutOverwriting_data()
+    {
+        QTest::addColumn<QString>("newName");
+        QTest::addColumn<bool>("targetIsDirectory");
+
+        QTest::newRow("target-is-file") << QStringLiteral("summary.txt") << false;
+        QTest::newRow("target-is-directory") << QStringLiteral("Archive") << true;
+    }
+
+    void renameToExistingFileOrDirectory_failsWithoutOverwriting()
+    {
+        using namespace MiniCloud::Server;
+
+        QFETCH(QString, newName);
+        QFETCH(bool, targetIsDirectory);
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QDir documentsDirectory(QDir(storageRoot).filePath(QStringLiteral("Documents")));
+
+        const QString sourcePath = documentsDirectory.filePath(QStringLiteral("report.txt"));
+        QFile sourceFile(sourcePath);
+        QVERIFY(sourceFile.open(QIODevice::WriteOnly));
+        QCOMPARE(sourceFile.write("source-data"), qint64{11});
+        sourceFile.close();
+
+        const QString targetFilePath = documentsDirectory.filePath(QStringLiteral("summary.txt"));
+        QFile targetFile(targetFilePath);
+        QVERIFY(targetFile.open(QIODevice::WriteOnly));
+        QCOMPARE(targetFile.write("target-data"), qint64{11});
+        targetFile.close();
+
+        const QString targetDirectoryPath = documentsDirectory.filePath(QStringLiteral("Archive"));
+        QVERIFY(documentsDirectory.mkdir(QStringLiteral("Archive")));
+
+        FileManager manager(storageRoot);
+
+        const FileManagerOperationResult result = manager.rename(QStringLiteral("/Documents/report.txt"), newName);
+
+        QCOMPARE(result.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!result.errorMessage.isEmpty());
+        QVERIFY(result.path.isEmpty());
+
+        QVERIFY(QFileInfo(sourcePath).isFile());
+        QFile unchangedSourceFile(sourcePath);
+        QVERIFY(unchangedSourceFile.open(QIODevice::ReadOnly));
+        QCOMPARE(unchangedSourceFile.readAll(), QByteArrayLiteral("source-data"));
+
+        const QFileInfo targetInfo(documentsDirectory.filePath(newName));
+        QVERIFY(targetInfo.exists());
+        QCOMPARE(targetInfo.isDir(), targetIsDirectory);
+
+        if (!targetIsDirectory)
+        {
+            QFile unchangedTargetFile(targetFilePath);
+            QVERIFY(unchangedTargetFile.open(QIODevice::ReadOnly));
+            QCOMPARE(unchangedTargetFile.readAll(), QByteArrayLiteral("target-data"));
+        }
+
+        const QStringList expectedEntries{
+            QStringLiteral("Archive"),
+            QStringLiteral("report.txt"),
+            QStringLiteral("summary.txt")};
+        QCOMPARE(documentsDirectory.entryList(QDir::NoDotAndDotDot | QDir::AllEntries, QDir::Name), expectedEntries);
+        QVERIFY(QFileInfo(targetDirectoryPath).isDir());
+    }
+
+    void moveExistingFile_toDifferentDirectory_preservesContentAndReturnsDestinationPath()
+    {
+        using namespace MiniCloud::Protocol;
+        using namespace MiniCloud::Server;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QDir storageDirectory(storageRoot);
+        QVERIFY(storageDirectory.mkdir(QStringLiteral("Archive")));
+
+        const QDir documentsDirectory(storageDirectory.filePath(QStringLiteral("Documents")));
+        const QString oldNativePath = documentsDirectory.filePath(QStringLiteral("report.txt"));
+        QFile reportFile(oldNativePath);
+        QVERIFY(reportFile.open(QIODevice::WriteOnly));
+        QCOMPARE(reportFile.write("quarterly-data"), qint64{14});
+        reportFile.close();
+
+        FileManager manager(storageRoot);
+
+        const FileManagerOperationResult result = manager.move(
+            QStringLiteral("/Documents/report.txt"),
+            QStringLiteral("/Archive"));
+
+        QCOMPARE(result.status, FileManagerOperationStatus::Success);
+        QVERIFY(result.errorMessage.isEmpty());
+        QCOMPARE(result.path, QStringLiteral("/Archive/report.txt"));
+
+        const QString newNativePath = storageDirectory.filePath(QStringLiteral("Archive/report.txt"));
+        QVERIFY(!QFileInfo::exists(oldNativePath));
+        QVERIFY(QFileInfo(newNativePath).isFile());
+
+        QFile movedFile(newNativePath);
+        QVERIFY(movedFile.open(QIODevice::ReadOnly));
+        QCOMPARE(movedFile.readAll(), QByteArrayLiteral("quarterly-data"));
+
+        const FileManagerBrowseResult documentsBrowseResult = manager.browse(QStringLiteral("/Documents"));
+        QCOMPARE(documentsBrowseResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(documentsBrowseResult.entries.isEmpty());
+
+        const FileManagerBrowseResult archiveBrowseResult = manager.browse(QStringLiteral("/Archive"));
+        QCOMPARE(archiveBrowseResult.status, FileManagerOperationStatus::Success);
+        QCOMPARE(archiveBrowseResult.entries.size(), 1);
+        QCOMPARE(archiveBrowseResult.entries.at(0).name, QStringLiteral("report.txt"));
+        QCOMPARE(archiveBrowseResult.entries.at(0).path, QStringLiteral("/Archive/report.txt"));
+        QCOMPARE(archiveBrowseResult.entries.at(0).type, FileEntryType::File);
+    }
+
+    void moveExistingDirectory_toDifferentDirectory_preservesDescendantsAndReturnsDestinationPath()
+    {
+        using namespace MiniCloud::Protocol;
+        using namespace MiniCloud::Server;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents/Projects"))));
+
+        const QDir storageDirectory(storageRoot);
+        QVERIFY(storageDirectory.mkdir(QStringLiteral("Archive")));
+
+        const QString oldDirectoryPath = storageDirectory.filePath(QStringLiteral("Documents/Projects"));
+        const QString planPath = QDir(oldDirectoryPath).filePath(QStringLiteral("plan.txt"));
+        QFile planFile(planPath);
+        QVERIFY(planFile.open(QIODevice::WriteOnly));
+        QCOMPARE(planFile.write("project-plan"), qint64{12});
+        planFile.close();
+
+        FileManager manager(storageRoot);
+
+        const FileManagerOperationResult result = manager.move(
+            QStringLiteral("/Documents/Projects"),
+            QStringLiteral("/Archive"));
+
+        QCOMPARE(result.status, FileManagerOperationStatus::Success);
+        QVERIFY(result.errorMessage.isEmpty());
+        QCOMPARE(result.path, QStringLiteral("/Archive/Projects"));
+
+        const QString newDirectoryPath = storageDirectory.filePath(QStringLiteral("Archive/Projects"));
+        const QString movedChildPath = QDir(newDirectoryPath).filePath(QStringLiteral("plan.txt"));
+        QVERIFY(!QFileInfo::exists(oldDirectoryPath));
+        QVERIFY(QFileInfo(newDirectoryPath).isDir());
+        QVERIFY(QFileInfo(movedChildPath).isFile());
+
+        QFile movedChildFile(movedChildPath);
+        QVERIFY(movedChildFile.open(QIODevice::ReadOnly));
+        QCOMPARE(movedChildFile.readAll(), QByteArrayLiteral("project-plan"));
+
+        const FileManagerBrowseResult documentsBrowseResult = manager.browse(QStringLiteral("/Documents"));
+        QCOMPARE(documentsBrowseResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(documentsBrowseResult.entries.isEmpty());
+
+        const FileManagerBrowseResult archiveBrowseResult = manager.browse(QStringLiteral("/Archive"));
+        QCOMPARE(archiveBrowseResult.status, FileManagerOperationStatus::Success);
+        QCOMPARE(archiveBrowseResult.entries.size(), 1);
+        QCOMPARE(archiveBrowseResult.entries.at(0).name, QStringLiteral("Projects"));
+        QCOMPARE(archiveBrowseResult.entries.at(0).path, QStringLiteral("/Archive/Projects"));
+        QCOMPARE(archiveBrowseResult.entries.at(0).type, FileEntryType::Directory);
+    }
+
+    void moveInvalidSourceOrDestination_failsWithoutMutation_data()
+    {
+        QTest::addColumn<QString>("sourcePath");
+        QTest::addColumn<QString>("destinationDirectoryPath");
+
+        QTest::newRow("missing-source") << QStringLiteral("/Documents/missing.txt") << QStringLiteral("/Archive");
+        QTest::newRow("root-source") << QStringLiteral("/") << QStringLiteral("/Archive");
+        QTest::newRow("traversal-source") << QStringLiteral("/../outside") << QStringLiteral("/Archive");
+        QTest::newRow("missing-destination") << QStringLiteral("/Documents/report.txt") << QStringLiteral("/Missing");
+        QTest::newRow("destination-is-file") << QStringLiteral("/Documents/report.txt") << QStringLiteral("/Documents/target.txt");
+        QTest::newRow("traversal-destination") << QStringLiteral("/Documents/report.txt") << QStringLiteral("/../outside");
+    }
+
+    void moveInvalidSourceOrDestination_failsWithoutMutation()
+    {
+        using namespace MiniCloud::Server;
+
+        QFETCH(QString, sourcePath);
+        QFETCH(QString, destinationDirectoryPath);
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QDir storageDirectory(storageRoot);
+        QVERIFY(storageDirectory.mkdir(QStringLiteral("Archive")));
+
+        const QDir documentsDirectory(storageDirectory.filePath(QStringLiteral("Documents")));
+        const QString reportPath = documentsDirectory.filePath(QStringLiteral("report.txt"));
+        QFile reportFile(reportPath);
+        QVERIFY(reportFile.open(QIODevice::WriteOnly));
+        QCOMPARE(reportFile.write("source-data"), qint64{11});
+        reportFile.close();
+
+        const QString targetPath = documentsDirectory.filePath(QStringLiteral("target.txt"));
+        QFile targetFile(targetPath);
+        QVERIFY(targetFile.open(QIODevice::WriteOnly));
+        QCOMPARE(targetFile.write("target-data"), qint64{11});
+        targetFile.close();
+
+        FileManager manager(storageRoot);
+
+        const FileManagerOperationResult result = manager.move(sourcePath, destinationDirectoryPath);
+
+        QCOMPARE(result.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!result.errorMessage.isEmpty());
+        QVERIFY(result.path.isEmpty());
+
+        QVERIFY(QFileInfo(reportPath).isFile());
+        QFile unchangedReportFile(reportPath);
+        QVERIFY(unchangedReportFile.open(QIODevice::ReadOnly));
+        QCOMPARE(unchangedReportFile.readAll(), QByteArrayLiteral("source-data"));
+
+        QVERIFY(QFileInfo(targetPath).isFile());
+        const QDir archiveDirectory(storageDirectory.filePath(QStringLiteral("Archive")));
+        QVERIFY(archiveDirectory.entryList(QDir::NoDotAndDotDot | QDir::AllEntries).isEmpty());
+    }
+
+    void moveDirectoryIntoOwnDescendant_failsWithoutMutation()
+    {
+        using namespace MiniCloud::Server;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents/Projects/Child"))));
+
+        const QDir storageDirectory(storageRoot);
+        const QString projectsPath = storageDirectory.filePath(QStringLiteral("Documents/Projects"));
+        const QString childPath = QDir(projectsPath).filePath(QStringLiteral("Child"));
+        const QString planFilePath = QDir(childPath).filePath(QStringLiteral("plan.txt"));
+        QFile planFile(planFilePath);
+        QVERIFY(planFile.open(QIODevice::WriteOnly));
+        QCOMPARE(planFile.write("plan"), qint64{4});
+        planFile.close();
+
+        FileManager manager(storageRoot);
+
+        const FileManagerOperationResult result = manager.move(
+            QStringLiteral("/Documents/Projects"),
+            QStringLiteral("/Documents/Projects/Child"));
+
+        QCOMPARE(result.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!result.errorMessage.isEmpty());
+        QVERIFY(result.path.isEmpty());
+
+        QVERIFY(QFileInfo(projectsPath).isDir());
+        QVERIFY(QFileInfo(childPath).isDir());
+        QVERIFY(QFileInfo(planFilePath).isFile());
+    }
+
+    void moveToDestinationWithSameLeafName_failsWithoutOverwriting_data()
+    {
+        QTest::addColumn<bool>("destinationEntryIsDirectory");
+
+        QTest::newRow("existing-file") << false;
+        QTest::newRow("existing-directory") << true;
+    }
+
+    void moveToDestinationWithSameLeafName_failsWithoutOverwriting()
+    {
+        using namespace MiniCloud::Server;
+
+        QFETCH(bool, destinationEntryIsDirectory);
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QDir storageDirectory(storageRoot);
+        QVERIFY(storageDirectory.mkdir(QStringLiteral("Archive")));
+
+        const QDir documentsDirectory(storageDirectory.filePath(QStringLiteral("Documents")));
+        const QString sourcePath = documentsDirectory.filePath(QStringLiteral("report.txt"));
+        QFile sourceFile(sourcePath);
+        QVERIFY(sourceFile.open(QIODevice::WriteOnly));
+        QCOMPARE(sourceFile.write("source-data"), qint64{11});
+        sourceFile.close();
+
+        const QDir archiveDirectory(storageDirectory.filePath(QStringLiteral("Archive")));
+        const QString destinationPath = archiveDirectory.filePath(QStringLiteral("report.txt"));
+
+        if (destinationEntryIsDirectory)
+        {
+            QVERIFY(archiveDirectory.mkdir(QStringLiteral("report.txt")));
+        }
+        else
+        {
+            QFile destinationFile(destinationPath);
+            QVERIFY(destinationFile.open(QIODevice::WriteOnly));
+            QCOMPARE(destinationFile.write("target-data"), qint64{11});
+            destinationFile.close();
+        }
+
+        FileManager manager(storageRoot);
+
+        const FileManagerOperationResult result = manager.move(
+            QStringLiteral("/Documents/report.txt"),
+            QStringLiteral("/Archive"));
+
+        QCOMPARE(result.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!result.errorMessage.isEmpty());
+        QVERIFY(result.path.isEmpty());
+
+        QVERIFY(QFileInfo(sourcePath).isFile());
+        QFile unchangedSourceFile(sourcePath);
+        QVERIFY(unchangedSourceFile.open(QIODevice::ReadOnly));
+        QCOMPARE(unchangedSourceFile.readAll(), QByteArrayLiteral("source-data"));
+
+        const QFileInfo destinationInfo(destinationPath);
+        QVERIFY(destinationInfo.exists());
+        QCOMPARE(destinationInfo.isDir(), destinationEntryIsDirectory);
+
+        if (!destinationEntryIsDirectory)
+        {
+            QFile unchangedDestinationFile(destinationPath);
+            QVERIFY(unchangedDestinationFile.open(QIODevice::ReadOnly));
+            QCOMPARE(unchangedDestinationFile.readAll(), QByteArrayLiteral("target-data"));
+        }
+
+        QCOMPARE(documentsDirectory.entryList(QDir::NoDotAndDotDot | QDir::AllEntries), QStringList{QStringLiteral("report.txt")});
+        QCOMPARE(archiveDirectory.entryList(QDir::NoDotAndDotDot | QDir::AllEntries), QStringList{QStringLiteral("report.txt")});
+    }
 };
 
 QTEST_MAIN(FileManagerTest)
