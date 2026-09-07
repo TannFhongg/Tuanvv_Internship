@@ -13,9 +13,18 @@ namespace MiniCloud::Server
         Failed
     };
 
+    enum class FileManagerBrowseFailureReason
+    {
+        None,
+        InvalidPath,
+        NotFound,
+        IoFailure
+    };
+
     struct FileManagerBrowseResult
     {
         FileManagerOperationStatus status = FileManagerOperationStatus::Failed;
+        FileManagerBrowseFailureReason failureReason = FileManagerBrowseFailureReason::None;
         QString errorMessage;
         QList<MiniCloud::Protocol::FileEntryData> entries;
     };

@@ -52,6 +52,7 @@ namespace MiniCloud::Server
 
         if (!isCanonicalLogicalPath(logicalPath))
         {
+            result.failureReason = FileManagerBrowseFailureReason::InvalidPath;
             result.errorMessage = QStringLiteral("Logical path must be canonical.");
             return result;
         }
@@ -60,6 +61,7 @@ namespace MiniCloud::Server
 
         if (!storageRootInfo.exists() || !storageRootInfo.isDir())
         {
+            result.failureReason = FileManagerBrowseFailureReason::IoFailure;
             result.errorMessage = QStringLiteral("Storage root is not an existing directory.");
             return result;
         }
@@ -71,6 +73,7 @@ namespace MiniCloud::Server
 
         if (!browseDirectoryInfo.exists() || !browseDirectoryInfo.isDir())
         {
+            result.failureReason = FileManagerBrowseFailureReason::NotFound;
             result.errorMessage = QStringLiteral("Logical path is not an existing directory.");
             return result;
         }
@@ -79,6 +82,7 @@ namespace MiniCloud::Server
 
         if (!storageDirectory.isReadable())
         {
+            result.failureReason = FileManagerBrowseFailureReason::IoFailure;
             result.errorMessage = QStringLiteral("Storage root cannot be read.");
             return result;
         }
@@ -133,6 +137,7 @@ namespace MiniCloud::Server
         if (query.trimmed().isEmpty())
         {
             FileManagerBrowseResult result;
+            result.failureReason = FileManagerBrowseFailureReason::InvalidPath;
             result.errorMessage = QStringLiteral("Search query must not be blank.");
             return result;
         }
