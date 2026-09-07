@@ -42,6 +42,8 @@ namespace MiniCloud::Server
 
         FileManagerOperationResult move(const QString &sourceLogicalPath, const QString &destinationDirectoryLogicalPath) const;
 
+        FileManagerOperationResult remove(const QString &logicalPath) const;
+
     private:
         QString m_storageRoot;
     };

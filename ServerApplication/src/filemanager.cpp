@@ -1,6 +1,7 @@
 #include "filemanager.h"
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QStringList>
 #include <QTimeZone>
@@ -332,6 +333,60 @@ namespace MiniCloud::Server
         }
 
         result.path = destinationDirectoryLogicalPath == QStringLiteral("/") ? QStringLiteral("/") + sourceName : destinationDirectoryLogicalPath + QLatin1Char('/') + sourceName;
+        result.status = FileManagerOperationStatus::Success;
+        return result;
+    }
+
+    FileManagerOperationResult FileManager::remove(const QString &logicalPath) const
+    {
+        FileManagerOperationResult result;
+
+        if (!isCanonicalLogicalPath(logicalPath) || logicalPath == QStringLiteral("/"))
+        {
+            result.errorMessage = QStringLiteral("Logical path must identify an entry.");
+            return result;
+        }
+
+        const QFileInfo storageRootInfo(m_storageRoot);
+
+        if (!storageRootInfo.exists() || !storageRootInfo.isDir())
+        {
+            result.errorMessage = QStringLiteral("Storage root is not an existing directory.");
+            return result;
+        }
+
+        const QString filesystemPath = QDir(m_storageRoot).filePath(logicalPath.mid(1));
+        const QFileInfo entryInfo(filesystemPath);
+
+        if (!entryInfo.exists())
+        {
+            result.errorMessage = QStringLiteral("Logical path does not exist.");
+            return result;
+        }
+
+        bool removed = false;
+
+        if (entryInfo.isFile())
+        {
+            removed = QFile::remove(filesystemPath);
+        }
+        else if (entryInfo.isDir())
+        {
+            const int lastSeparatorIndex = logicalPath.lastIndexOf(QLatin1Char('/'));
+            const QString parentLogicalPath = logicalPath.left(lastSeparatorIndex);
+            const QString entryName = logicalPath.mid(lastSeparatorIndex + 1);
+            const QString parentFilesystemPath = QDir(m_storageRoot).filePath(parentLogicalPath.mid(1));
+            const QDir parentDirectory(parentFilesystemPath);
+            removed = parentDirectory.rmdir(entryName);
+        }
+
+        if (!removed)
+        {
+            result.errorMessage = QStringLiteral("Failed to remove entry.");
+            return result;
+        }
+
+        result.path = logicalPath;
         result.status = FileManagerOperationStatus::Success;
         return result;
     }
