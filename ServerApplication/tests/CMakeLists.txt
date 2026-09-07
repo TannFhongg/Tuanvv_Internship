@@ -188,6 +188,30 @@ add_test(
 )
 
 add_test(
+    NAME FileManagerTest.removeExistingFile_deletesAndReturnsLogicalPath
+    COMMAND FileManagerTests
+            removeExistingFile_deletesAndReturnsLogicalPath
+)
+
+add_test(
+    NAME FileManagerTest.removeEmptyDirectory_deletesAndReturnsLogicalPath
+    COMMAND FileManagerTests
+            removeEmptyDirectory_deletesAndReturnsLogicalPath
+)
+
+add_test(
+    NAME FileManagerTest.removeNonEmptyDirectory_failsWithoutMutation
+    COMMAND FileManagerTests
+            removeNonEmptyDirectory_failsWithoutMutation
+)
+
+add_test(
+    NAME FileManagerTest.removeInvalidOrProtectedPath_failsWithoutMutation
+    COMMAND FileManagerTests
+            removeInvalidOrProtectedPath_failsWithoutMutation
+)
+
+add_test(
     NAME FileManagerTest.searchCurrentDirectory_caseInsensitiveSubstring_returnsSortedDirectMatches
     COMMAND FileManagerTests
             searchCurrentDirectory_caseInsensitiveSubstring_returnsSortedDirectMatches
