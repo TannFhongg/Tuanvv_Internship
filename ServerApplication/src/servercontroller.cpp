@@ -2,8 +2,11 @@
 
 #include <utility>
 
-ServerController::ServerController(QString repositoryFilePath, QObject *parent)
-    : QObject(parent), m_licenseManager(std::move(repositoryFilePath)), m_dispatcher(m_licenseManager)
+ServerController::ServerController(QString repositoryFilePath, QString storageRoot, QObject *parent)
+    : QObject(parent),
+      m_licenseManager(std::move(repositoryFilePath)),
+      m_fileManager(std::move(storageRoot)),
+      m_dispatcher(m_licenseManager, m_fileManager)
 {
     connect(
         &m_tcpServer,

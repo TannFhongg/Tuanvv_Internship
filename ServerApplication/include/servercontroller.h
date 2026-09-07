@@ -6,6 +6,7 @@
 
 #include "ServerRequestDispatcher.h"
 #include "TcpServer.h"
+#include "filemanager.h"
 #include "licensemanager.h"
 
 class ServerController : public QObject
@@ -15,6 +16,7 @@ class ServerController : public QObject
 public:
     explicit ServerController(
         QString repositoryFilePath,
+        QString storageRoot,
         QObject *parent = nullptr);
 
     MiniCloud::Server::LicenseManagerResult initialize();
@@ -27,6 +29,7 @@ public:
 
 private:
     MiniCloud::Server::LicenseManager m_licenseManager;
+    MiniCloud::Server::FileManager m_fileManager;
 
     ServerRequestDispatcher m_dispatcher;
     

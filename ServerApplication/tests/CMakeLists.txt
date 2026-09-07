@@ -323,6 +323,11 @@ add_test(
 )
 
 add_test(
+    NAME ServerControllerTest.browseRequest_afterAuthentication_overTcp_returnsCorrelatedEntries
+    COMMAND ServerControllerTest browseRequest_afterAuthentication_overTcp_returnsCorrelatedEntries
+)
+
+add_test(
     NAME LicenseManagerTest.initialize_missingRepository_succeeds
     COMMAND LicenseManagerTest initialize_missingRepository_succeeds
 )
@@ -475,6 +480,61 @@ add_test(
 add_test(
     NAME ServerRequestDispatcherTest.authenticateRequest_validBoundLicense_returnsCorrelatedValidResponseAndAuthenticatesSession
     COMMAND ServerRequestDispatcherTest authenticateRequest_validBoundLicense_returnsCorrelatedValidResponseAndAuthenticatesSession
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.browseRequest_authenticatedSession_returnsCorrelatedEntries
+    COMMAND ServerRequestDispatcherTest browseRequest_authenticatedSession_returnsCorrelatedEntries
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.browseRequest_beforeAuthentication_returnsCorrelatedAuthenticationFailedAndKeepsSessionLocked
+    COMMAND ServerRequestDispatcherTest browseRequest_beforeAuthentication_returnsCorrelatedAuthenticationFailedAndKeepsSessionLocked
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.browseRequest_malformedPayload_returnsCorrelatedInvalidRequestWithoutMutatingStorage
+    COMMAND ServerRequestDispatcherTest browseRequest_malformedPayload_returnsCorrelatedInvalidRequestWithoutMutatingStorage
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.browseRequest_missingDirectory_returnsCorrelatedFileNotFoundAndKeepsSessionAuthenticated
+    COMMAND ServerRequestDispatcherTest browseRequest_missingDirectory_returnsCorrelatedFileNotFoundAndKeepsSessionAuthenticated
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.browseRequest_nonCanonicalPath_returnsCorrelatedInvalidRequestAndKeepsSessionAuthenticated
+    COMMAND ServerRequestDispatcherTest browseRequest_nonCanonicalPath_returnsCorrelatedInvalidRequestAndKeepsSessionAuthenticated
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.createDirectoryRequest_authenticatedSession_createsDirectoryAndReturnsCorrelatedPath
+    COMMAND ServerRequestDispatcherTest createDirectoryRequest_authenticatedSession_createsDirectoryAndReturnsCorrelatedPath
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.searchRequest_authenticatedSession_returnsCorrelatedDirectMatches
+    COMMAND ServerRequestDispatcherTest searchRequest_authenticatedSession_returnsCorrelatedDirectMatches
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.renameRequest_authenticatedSession_renamesEntryAndReturnsCorrelatedPath
+    COMMAND ServerRequestDispatcherTest renameRequest_authenticatedSession_renamesEntryAndReturnsCorrelatedPath
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.moveRequest_authenticatedSession_movesEntryAndReturnsCorrelatedPath
+    COMMAND ServerRequestDispatcherTest moveRequest_authenticatedSession_movesEntryAndReturnsCorrelatedPath
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.deleteRequest_authenticatedSession_removesFileAndReturnsCorrelatedPath
+    COMMAND ServerRequestDispatcherTest deleteRequest_authenticatedSession_removesFileAndReturnsCorrelatedPath
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.deleteRequest_beforeAuthentication_returnsCorrelatedAuthenticationFailedAndPreservesFile
+    COMMAND ServerRequestDispatcherTest deleteRequest_beforeAuthentication_returnsCorrelatedAuthenticationFailedAndPreservesFile
 )
 
 add_test(
