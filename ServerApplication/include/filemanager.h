@@ -38,6 +38,10 @@ namespace MiniCloud::Server
 
         FileManagerOperationResult createDirectory(const QString &parentLogicalPath, const QString &name) const;
 
+        FileManagerOperationResult rename(const QString &sourceLogicalPath, const QString &newName) const;
+
+        FileManagerOperationResult move(const QString &sourceLogicalPath, const QString &destinationDirectoryLogicalPath) const;
+
     private:
         QString m_storageRoot;
     };

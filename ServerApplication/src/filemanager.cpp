@@ -185,7 +185,7 @@ namespace MiniCloud::Server
         const QString parentRelativePath = parentLogicalPath.mid(1);
 
         const QString parentFilesystemPath = QDir(m_storageRoot).filePath(parentRelativePath);
-        
+
         const QFileInfo parentDirectoryInfo(parentFilesystemPath);
 
         if (!parentDirectoryInfo.exists() || !parentDirectoryInfo.isDir())
@@ -194,7 +194,7 @@ namespace MiniCloud::Server
             return result;
         }
 
-        const QDir parentDirectory(parentFilesystemPath);
+        QDir parentDirectory(parentFilesystemPath);
 
         if (!parentDirectory.mkdir(name))
         {
@@ -203,6 +203,135 @@ namespace MiniCloud::Server
         }
 
         result.path = parentLogicalPath == QStringLiteral("/") ? QStringLiteral("/") + name : parentLogicalPath + QLatin1Char('/') + name;
+        result.status = FileManagerOperationStatus::Success;
+        return result;
+    }
+
+    FileManagerOperationResult FileManager::rename(const QString &sourceLogicalPath, const QString &newName) const
+    {
+        FileManagerOperationResult result;
+
+        if (!isCanonicalLogicalPath(sourceLogicalPath) || sourceLogicalPath == QStringLiteral("/"))
+        {
+            result.errorMessage = QStringLiteral("Source logical path must identify an entry.");
+            return result;
+        }
+
+        if (!isValidLeafName(newName))
+        {
+            result.errorMessage = QStringLiteral("New name is invalid.");
+            return result;
+        }
+
+        const QFileInfo storageRootInfo(m_storageRoot);
+
+        if (!storageRootInfo.exists() || !storageRootInfo.isDir())
+        {
+            result.errorMessage = QStringLiteral("Storage root is not an existing directory.");
+            return result;
+        }
+
+        const QString sourceRelativePath = sourceLogicalPath.mid(1);
+        const QString sourceFilesystemPath = QDir(m_storageRoot).filePath(sourceRelativePath);
+        const QFileInfo sourceInfo(sourceFilesystemPath);
+
+        if (!sourceInfo.exists())
+        {
+            result.errorMessage = QStringLiteral("Source logical path does not exist.");
+            return result;
+        }
+
+        const int lastSeparatorIndex = sourceLogicalPath.lastIndexOf(QLatin1Char('/'));
+        const QString parentLogicalPath = sourceLogicalPath.left(lastSeparatorIndex);
+        const QString sourceName = sourceLogicalPath.mid(lastSeparatorIndex + 1);
+
+        const QString parentFilesystemPath = QDir(m_storageRoot).filePath(parentLogicalPath.mid(1));
+        QDir parentDirectory(parentFilesystemPath);
+
+        if (QFileInfo::exists(parentDirectory.filePath(newName)))
+        {
+            result.errorMessage = QStringLiteral("Destination entry already exists.");
+            return result;
+        }
+
+        if (!parentDirectory.rename(sourceName, newName))
+        {
+            result.errorMessage = QStringLiteral("Failed to rename entry.");
+            return result;
+        }
+
+        result.path = parentLogicalPath.isEmpty() ? QStringLiteral("/") + newName : parentLogicalPath + QLatin1Char('/') + newName;
+
+        result.status = FileManagerOperationStatus::Success;
+        return result;
+    }
+
+    FileManagerOperationResult FileManager::move(const QString &sourceLogicalPath, const QString &destinationDirectoryLogicalPath) const
+    {
+        FileManagerOperationResult result;
+
+        if (!isCanonicalLogicalPath(sourceLogicalPath) || sourceLogicalPath == QStringLiteral("/"))
+        {
+            result.errorMessage = QStringLiteral("Source logical path must identify an entry.");
+            return result;
+        }
+
+        if (!isCanonicalLogicalPath(destinationDirectoryLogicalPath))
+        {
+            result.errorMessage = QStringLiteral("Destination logical path must be canonical.");
+            return result;
+        }
+
+        const QFileInfo storageRootInfo(m_storageRoot);
+
+        if (!storageRootInfo.exists() || !storageRootInfo.isDir())
+        {
+            result.errorMessage = QStringLiteral("Storage root is not an existing directory.");
+            return result;
+        }
+
+        const QString sourceFilesystemPath = QDir(m_storageRoot).filePath(sourceLogicalPath.mid(1));
+        const QFileInfo sourceInfo(sourceFilesystemPath);
+
+        if (!sourceInfo.exists())
+        {
+            result.errorMessage = QStringLiteral("Source logical path does not exist.");
+            return result;
+        }
+
+        if (sourceInfo.isDir() && (destinationDirectoryLogicalPath == sourceLogicalPath || destinationDirectoryLogicalPath.startsWith(sourceLogicalPath + QLatin1Char('/'))))
+        {
+            result.errorMessage = QStringLiteral("Destination directory cannot be the source or its descendant.");
+            return result;
+        }
+
+        const QString destinationFilesystemPath = QDir(m_storageRoot).filePath(destinationDirectoryLogicalPath.mid(1));
+        const QFileInfo destinationDirectoryInfo(destinationFilesystemPath);
+
+        if (!destinationDirectoryInfo.exists() || !destinationDirectoryInfo.isDir())
+        {
+            result.errorMessage = QStringLiteral("Destination logical path is not an existing directory.");
+            return result;
+        }
+
+        const QString sourceName = sourceLogicalPath.mid(sourceLogicalPath.lastIndexOf(QLatin1Char('/')) + 1);
+        const QString destinationEntryFilesystemPath = QDir(destinationFilesystemPath).filePath(sourceName);
+
+        if (QFileInfo::exists(destinationEntryFilesystemPath))
+        {
+            result.errorMessage = QStringLiteral("Destination entry already exists.");
+            return result;
+        }
+
+        QDir filesystemDirectory;
+
+        if (!filesystemDirectory.rename(sourceFilesystemPath, destinationEntryFilesystemPath))
+        {
+            result.errorMessage = QStringLiteral("Failed to move entry.");
+            return result;
+        }
+
+        result.path = destinationDirectoryLogicalPath == QStringLiteral("/") ? QStringLiteral("/") + sourceName : destinationDirectoryLogicalPath + QLatin1Char('/') + sourceName;
         result.status = FileManagerOperationStatus::Success;
         return result;
     }
