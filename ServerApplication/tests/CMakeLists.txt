@@ -616,6 +616,31 @@ add_test(
 )
 
 add_test(
+    NAME ServerRequestDispatcherTest.downloadRequest_authenticatedSession_returnsCorrelatedStartChunksAndCompletion
+    COMMAND ServerRequestDispatcherTest downloadRequest_authenticatedSession_returnsCorrelatedStartChunksAndCompletion
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.downloadRequest_emptyFile_returnsCorrelatedStartAndCompletionWithoutChunks
+    COMMAND ServerRequestDispatcherTest downloadRequest_emptyFile_returnsCorrelatedStartAndCompletionWithoutChunks
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.downloadRequest_beforeAuthentication_returnsCorrelatedAuthenticationFailedWithoutDataFrames
+    COMMAND ServerRequestDispatcherTest downloadRequest_beforeAuthentication_returnsCorrelatedAuthenticationFailedWithoutDataFrames
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.downloadRequest_malformedPayload_returnsCorrelatedInvalidRequestWithoutDataFrames
+    COMMAND ServerRequestDispatcherTest downloadRequest_malformedPayload_returnsCorrelatedInvalidRequestWithoutDataFrames
+)
+
+add_test(
+    NAME ServerRequestDispatcherTest.downloadRequest_missingFile_returnsCorrelatedFileNotFoundWithoutDataFrames
+    COMMAND ServerRequestDispatcherTest downloadRequest_missingFile_returnsCorrelatedFileNotFoundWithoutDataFrames
+)
+
+add_test(
     NAME ServerRequestDispatcherTest.browseRequest_malformedPayload_returnsCorrelatedInvalidRequestWithoutMutatingStorage
     COMMAND ServerRequestDispatcherTest browseRequest_malformedPayload_returnsCorrelatedInvalidRequestWithoutMutatingStorage
 )
