@@ -13,6 +13,16 @@ ServerRequestDispatcher::ServerRequestDispatcher(MiniCloud::Server::LicenseManag
 ServerRequestDispatcher::ServerRequestDispatcher(MiniCloud::Server::LicenseManager &licenseManager, MiniCloud::Server::FileManager &fileManager)
     : m_licenseManager(licenseManager), m_fileManager(&fileManager) {}
 
+void ServerRequestDispatcher::cancelActiveUpload()
+{
+    if (m_fileManager != nullptr)
+    {
+        m_fileManager->cancelUpload();
+    }
+
+    m_activeUploadRequestId.reset();
+}
+
 void ServerRequestDispatcher::handleFrame(ClientSession &session, const MiniCloud::Protocol::ProtocolFrame &frame)
 {
     if (frame.header.messageType == MiniCloud::Protocol::MessageType::FileChunk && !session.isAuthenticated())
@@ -30,6 +40,217 @@ void ServerRequestDispatcher::handleFrame(ClientSession &session, const MiniClou
                 frame.header.requestId,
                 frame.header.taskId,
                 errorResponse.payload);
+        }
+        return;
+    }
+
+    if (frame.header.messageType == MiniCloud::Protocol::MessageType::UploadStartRequest)
+    {
+        if (!session.isAuthenticated())
+        {
+            const MiniCloud::Protocol::ErrorResponseData errorData{MiniCloud::Protocol::ErrorCode::AuthenticationFailed, QStringLiteral("Authentication is required to start uploads.")};
+
+            const MiniCloud::Protocol::ErrorResponseEncodeResult errorResponse = MiniCloud::Protocol::serializeErrorResponse(errorData);
+
+            if (errorResponse.status == MiniCloud::Protocol::ErrorResponseEncodeResult::Status::Success)
+            {
+                session.sendFrame(
+                    MiniCloud::Protocol::MessageType::ErrorResponse,
+                    frame.header.requestId,
+                    frame.header.taskId,
+                    errorResponse.payload);
+            }
+            return;
+        }
+
+        if (m_fileManager == nullptr)
+        {
+            const MiniCloud::Protocol::ErrorResponseData errorData{MiniCloud::Protocol::ErrorCode::InternalServerError, QStringLiteral("File manager is unavailable.")};
+
+            const MiniCloud::Protocol::ErrorResponseEncodeResult errorResponse = MiniCloud::Protocol::serializeErrorResponse(errorData);
+
+            if (errorResponse.status == MiniCloud::Protocol::ErrorResponseEncodeResult::Status::Success)
+            {
+                session.sendFrame(
+                    MiniCloud::Protocol::MessageType::ErrorResponse,
+                    frame.header.requestId,
+                    frame.header.taskId,
+                    errorResponse.payload);
+            }
+            return;
+        }
+
+        const MiniCloud::Protocol::UploadStartRequestDecodeResult request = MiniCloud::Protocol::deserializeUploadStartRequest(frame.payload);
+
+        if (request.status != MiniCloud::Protocol::UploadStartRequestDecodeResult::Status::Success)
+        {
+            const MiniCloud::Protocol::ErrorResponseData errorData{MiniCloud::Protocol::ErrorCode::InvalidRequest, QStringLiteral("Upload start request is invalid.")};
+
+            const MiniCloud::Protocol::ErrorResponseEncodeResult errorResponse = MiniCloud::Protocol::serializeErrorResponse(errorData);
+
+            if (errorResponse.status == MiniCloud::Protocol::ErrorResponseEncodeResult::Status::Success)
+            {
+                session.sendFrame(
+                    MiniCloud::Protocol::MessageType::ErrorResponse,
+                    frame.header.requestId,
+                    frame.header.taskId,
+                    errorResponse.payload);
+            }
+            return;
+        }
+
+        const MiniCloud::Server::FileManagerUploadStartResult uploadResult =
+            m_fileManager->beginUpload(request.data.destinationDirectoryPath, request.data.fileName, request.data.totalSizeBytes);
+
+        if (uploadResult.status != MiniCloud::Server::FileManagerOperationStatus::Success)
+        {
+            const MiniCloud::Protocol::ErrorResponseData errorData{
+                MiniCloud::Protocol::ErrorCode::InvalidRequest, uploadResult.errorMessage};
+
+            const MiniCloud::Protocol::ErrorResponseEncodeResult errorResponse = MiniCloud::Protocol::serializeErrorResponse(errorData);
+
+            if (errorResponse.status == MiniCloud::Protocol::ErrorResponseEncodeResult::Status::Success)
+            {
+                session.sendFrame(
+                    MiniCloud::Protocol::MessageType::ErrorResponse,
+                    frame.header.requestId,
+                    frame.header.taskId,
+                    errorResponse.payload);
+            }
+            return;
+        }
+
+        if (uploadResult.completed)
+        {
+            const MiniCloud::Protocol::FileOperationResponseData responseData{uploadResult.path};
+            const MiniCloud::Protocol::FileProtocolEncodeResult response =
+                MiniCloud::Protocol::serializeFileOperationResponse(responseData);
+
+            if (response.status == MiniCloud::Protocol::FileProtocolEncodeResult::Status::Success)
+            {
+                session.sendFrame(
+                    MiniCloud::Protocol::MessageType::FileOperationResponse,
+                    frame.header.requestId,
+                    frame.header.taskId,
+                    response.payload);
+            }
+            return;
+        }
+
+        m_activeUploadRequestId = frame.header.requestId;
+        const MiniCloud::Protocol::UploadReadyResponseData responseData{uploadResult.path};
+
+        const MiniCloud::Protocol::FileProtocolEncodeResult response = MiniCloud::Protocol::serializeUploadReadyResponse(responseData);
+
+        if (response.status == MiniCloud::Protocol::FileProtocolEncodeResult::Status::Success)
+        {
+            session.sendFrame(
+                MiniCloud::Protocol::MessageType::UploadReadyResponse,
+                frame.header.requestId,
+                frame.header.taskId,
+                response.payload);
+        }
+        return;
+    }
+
+    if (frame.header.messageType == MiniCloud::Protocol::MessageType::FileChunk)
+    {
+        if (m_fileManager == nullptr)
+        {
+            const MiniCloud::Protocol::ErrorResponseData errorData{
+                MiniCloud::Protocol::ErrorCode::InternalServerError, QStringLiteral("File manager is unavailable.")};
+
+            const MiniCloud::Protocol::ErrorResponseEncodeResult errorResponse = MiniCloud::Protocol::serializeErrorResponse(errorData);
+
+            if (errorResponse.status == MiniCloud::Protocol::ErrorResponseEncodeResult::Status::Success)
+            {
+                session.sendFrame(
+                    MiniCloud::Protocol::MessageType::ErrorResponse,
+                    frame.header.requestId,
+                    frame.header.taskId,
+                    errorResponse.payload);
+            }
+            return;
+        }
+
+        if (!m_activeUploadRequestId.has_value() || frame.header.requestId != m_activeUploadRequestId.value())
+        {
+            const MiniCloud::Protocol::ErrorResponseData errorData{
+                MiniCloud::Protocol::ErrorCode::InvalidRequest,
+                QStringLiteral("File chunk request ID does not match the active upload.")};
+
+            const MiniCloud::Protocol::ErrorResponseEncodeResult errorResponse = MiniCloud::Protocol::serializeErrorResponse(errorData);
+
+            if (errorResponse.status == MiniCloud::Protocol::ErrorResponseEncodeResult::Status::Success)
+            {
+                session.sendFrame(
+                    MiniCloud::Protocol::MessageType::ErrorResponse,
+                    frame.header.requestId,
+                    frame.header.taskId,
+                    errorResponse.payload);
+            }
+            return;
+        }
+
+        const MiniCloud::Protocol::FileChunkDecodeResult request = MiniCloud::Protocol::deserializeFileChunk(frame.payload);
+
+        if (request.status != MiniCloud::Protocol::FileChunkDecodeResult::Status::Success)
+        {
+            const MiniCloud::Protocol::ErrorResponseData errorData{
+                MiniCloud::Protocol::ErrorCode::InvalidRequest, QStringLiteral("File chunk is invalid.")};
+
+            const MiniCloud::Protocol::ErrorResponseEncodeResult errorResponse = MiniCloud::Protocol::serializeErrorResponse(errorData);
+
+            if (errorResponse.status == MiniCloud::Protocol::ErrorResponseEncodeResult::Status::Success)
+            {
+                session.sendFrame(
+                    MiniCloud::Protocol::MessageType::ErrorResponse,
+                    frame.header.requestId,
+                    frame.header.taskId,
+                    errorResponse.payload);
+            }
+            return;
+        }
+
+        const MiniCloud::Server::FileManagerUploadChunkResult chunkResult =
+            m_fileManager->appendUploadChunk(request.data.offset, request.data.bytes);
+
+        if (chunkResult.status != MiniCloud::Server::FileManagerOperationStatus::Success)
+        {
+            m_activeUploadRequestId.reset();
+            const MiniCloud::Protocol::ErrorResponseData errorData{
+                MiniCloud::Protocol::ErrorCode::InvalidRequest, chunkResult.errorMessage};
+
+            const MiniCloud::Protocol::ErrorResponseEncodeResult errorResponse = MiniCloud::Protocol::serializeErrorResponse(errorData);
+
+            if (errorResponse.status == MiniCloud::Protocol::ErrorResponseEncodeResult::Status::Success)
+            {
+                session.sendFrame(
+                    MiniCloud::Protocol::MessageType::ErrorResponse,
+                    frame.header.requestId,
+                    frame.header.taskId,
+                    errorResponse.payload);
+            }
+            return;
+        }
+
+        if (!chunkResult.completed)
+        {
+            return;
+        }
+
+        m_activeUploadRequestId.reset();
+
+        const MiniCloud::Protocol::FileOperationResponseData responseData{chunkResult.path};
+        const MiniCloud::Protocol::FileProtocolEncodeResult response = MiniCloud::Protocol::serializeFileOperationResponse(responseData);
+
+        if (response.status == MiniCloud::Protocol::FileProtocolEncodeResult::Status::Success)
+        {
+            session.sendFrame(
+                MiniCloud::Protocol::MessageType::FileOperationResponse,
+                frame.header.requestId,
+                frame.header.taskId,
+                response.payload);
         }
         return;
     }
