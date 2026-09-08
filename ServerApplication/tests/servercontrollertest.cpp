@@ -210,6 +210,357 @@ private slots:
         controller.stop();
         QTRY_COMPARE(clientSocket.state(), QAbstractSocket::UnconnectedState);
     }
+
+    void uploadSequentialChunks_afterAuthentication_overTcp_commitsAndReturnsCorrelatedCompletion()
+    {
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString repositoryFilePath = temporaryDirectory.filePath(QStringLiteral("licenses.json"));
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const LicenseRecord license{QStringLiteral("MCLD-BOUND-0001"), QStringLiteral("DEVICE-OWNER"), true};
+        LicenseRepository repository(repositoryFilePath);
+        QCOMPARE(repository.insert(license).status, LicenseRepositoryStatus::Success);
+
+        ServerController controller(repositoryFilePath, storageRoot);
+        QCOMPARE(controller.initialize().status, LicenseManagerOperationStatus::Success);
+        QVERIFY(controller.startListening(QHostAddress::LocalHost, 0));
+
+        QTcpSocket clientSocket;
+        clientSocket.connectToHost(QHostAddress::LocalHost, controller.serverPort());
+        QTRY_COMPARE(clientSocket.state(), QAbstractSocket::ConnectedState);
+
+        const AuthenticationEncodeResult authenticationPayload =
+            MiniCloud::Protocol::serializeAuthenticateRequest({license.productKey, license.deviceId});
+        QCOMPARE(authenticationPayload.status, AuthenticationEncodeResult::Status::Success);
+
+        constexpr TaskId taskId = 0;
+        constexpr RequestId authenticationRequestId = 901;
+        const FrameEncodeResult encodedAuthentication = MiniCloud::Protocol::serializeFrame(
+            MessageType::AuthenticateRequest,
+            authenticationRequestId,
+            taskId,
+            authenticationPayload.payload);
+        QCOMPARE(encodedAuthentication.status, FrameEncodeStatus::Success);
+        QCOMPARE(
+            clientSocket.write(encodedAuthentication.encodedFrame),
+            static_cast<qint64>(encodedAuthentication.encodedFrame.size()));
+        QVERIFY(clientSocket.waitForBytesWritten());
+
+        QTRY_VERIFY(clientSocket.bytesAvailable() > 0);
+        FrameParser authenticationResponseParser;
+        authenticationResponseParser.appendData(clientSocket.readAll());
+        const FrameParser::FrameParseResult authenticationResponse =
+            authenticationResponseParser.tryTakeFrame();
+        QCOMPARE(authenticationResponse.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(authenticationResponse.frame.header.messageType, MessageType::AuthenticateResponse);
+        QCOMPARE(authenticationResponse.frame.header.requestId, authenticationRequestId);
+
+        const AuthenticateResponseDecodeResult decodedAuthentication =
+            MiniCloud::Protocol::deserializeAuthenticateResponse(authenticationResponse.frame.payload);
+        QCOMPARE(decodedAuthentication.status, AuthenticateResponseDecodeResult::Status::Success);
+        QCOMPARE(decodedAuthentication.data.status, AuthenticationStatus::Valid);
+
+        const MiniCloud::Protocol::FileProtocolEncodeResult uploadStartPayload =
+            MiniCloud::Protocol::serializeUploadStartRequest(
+                {QStringLiteral("/Documents"), QStringLiteral("report.bin"), 5});
+        QCOMPARE(uploadStartPayload.status, MiniCloud::Protocol::FileProtocolEncodeResult::Status::Success);
+
+        constexpr RequestId uploadRequestId = 902;
+        const FrameEncodeResult encodedUploadStart = MiniCloud::Protocol::serializeFrame(
+            MessageType::UploadStartRequest,
+            uploadRequestId,
+            taskId,
+            uploadStartPayload.payload);
+        QCOMPARE(encodedUploadStart.status, FrameEncodeStatus::Success);
+        QCOMPARE(
+            clientSocket.write(encodedUploadStart.encodedFrame),
+            static_cast<qint64>(encodedUploadStart.encodedFrame.size()));
+        QVERIFY(clientSocket.waitForBytesWritten());
+
+        QTRY_VERIFY(clientSocket.bytesAvailable() > 0);
+        FrameParser uploadReadyParser;
+        uploadReadyParser.appendData(clientSocket.readAll());
+        const FrameParser::FrameParseResult uploadReadyResponse = uploadReadyParser.tryTakeFrame();
+        QCOMPARE(uploadReadyResponse.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(uploadReadyResponse.frame.header.messageType, MessageType::UploadReadyResponse);
+        QCOMPARE(uploadReadyResponse.frame.header.requestId, uploadRequestId);
+        QCOMPARE(uploadReadyResponse.frame.header.taskId, taskId);
+
+        const MiniCloud::Protocol::UploadReadyResponseDecodeResult decodedReady =
+            MiniCloud::Protocol::deserializeUploadReadyResponse(uploadReadyResponse.frame.payload);
+        QCOMPARE(decodedReady.status, MiniCloud::Protocol::UploadReadyResponseDecodeResult::Status::Success);
+        QCOMPARE(decodedReady.data.path, QStringLiteral("/Documents/report.bin"));
+
+        const MiniCloud::Protocol::FileProtocolEncodeResult firstChunkPayload =
+            MiniCloud::Protocol::serializeFileChunk({0, QByteArrayLiteral("abc")});
+        QCOMPARE(firstChunkPayload.status, MiniCloud::Protocol::FileProtocolEncodeResult::Status::Success);
+
+        const FrameEncodeResult encodedFirstChunk = MiniCloud::Protocol::serializeFrame(
+            MessageType::FileChunk,
+            uploadRequestId,
+            taskId,
+            firstChunkPayload.payload);
+        QCOMPARE(encodedFirstChunk.status, FrameEncodeStatus::Success);
+        QCOMPARE(
+            clientSocket.write(encodedFirstChunk.encodedFrame),
+            static_cast<qint64>(encodedFirstChunk.encodedFrame.size()));
+        QVERIFY(clientSocket.waitForBytesWritten());
+
+        const MiniCloud::Protocol::FileProtocolEncodeResult finalChunkPayload =
+            MiniCloud::Protocol::serializeFileChunk({3, QByteArrayLiteral("de")});
+        QCOMPARE(finalChunkPayload.status, MiniCloud::Protocol::FileProtocolEncodeResult::Status::Success);
+
+        const FrameEncodeResult encodedFinalChunk = MiniCloud::Protocol::serializeFrame(
+            MessageType::FileChunk,
+            uploadRequestId,
+            taskId,
+            finalChunkPayload.payload);
+        QCOMPARE(encodedFinalChunk.status, FrameEncodeStatus::Success);
+        QCOMPARE(
+            clientSocket.write(encodedFinalChunk.encodedFrame),
+            static_cast<qint64>(encodedFinalChunk.encodedFrame.size()));
+        QVERIFY(clientSocket.waitForBytesWritten());
+
+        QTRY_VERIFY(clientSocket.bytesAvailable() > 0);
+        FrameParser completionResponseParser;
+        completionResponseParser.appendData(clientSocket.readAll());
+        const FrameParser::FrameParseResult completionResponse =
+            completionResponseParser.tryTakeFrame();
+        QCOMPARE(completionResponse.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(completionResponse.frame.header.messageType, MessageType::FileOperationResponse);
+        QCOMPARE(completionResponse.frame.header.requestId, uploadRequestId);
+        QCOMPARE(completionResponse.frame.header.taskId, taskId);
+
+        const MiniCloud::Protocol::FileOperationResponseDecodeResult decodedCompletion =
+            MiniCloud::Protocol::deserializeFileOperationResponse(completionResponse.frame.payload);
+        QCOMPARE(decodedCompletion.status, MiniCloud::Protocol::FileOperationResponseDecodeResult::Status::Success);
+        QCOMPARE(decodedCompletion.data.path, QStringLiteral("/Documents/report.bin"));
+
+        const QString reportNativePath =
+            QDir(storageRoot).filePath(QStringLiteral("Documents/report.bin"));
+        QFile reportFile(reportNativePath);
+        QVERIFY(reportFile.open(QIODevice::ReadOnly));
+        QCOMPARE(reportFile.readAll(), QByteArrayLiteral("abcde"));
+
+        controller.stop();
+        QTRY_COMPARE(clientSocket.state(), QAbstractSocket::UnconnectedState);
+    }
+
+    void clientDisconnect_duringUpload_discardsTemporaryFileAndAllowsCleanRestart()
+    {
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString repositoryFilePath = temporaryDirectory.filePath(QStringLiteral("licenses.json"));
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const LicenseRecord license{QStringLiteral("MCLD-BOUND-0001"), QStringLiteral("DEVICE-OWNER"), true};
+        LicenseRepository repository(repositoryFilePath);
+        QCOMPARE(repository.insert(license).status, LicenseRepositoryStatus::Success);
+
+        ServerController controller(repositoryFilePath, storageRoot);
+        QCOMPARE(controller.initialize().status, LicenseManagerOperationStatus::Success);
+        QVERIFY(controller.startListening(QHostAddress::LocalHost, 0));
+
+        constexpr TaskId taskId = 0;
+        const AuthenticationEncodeResult authenticationPayload =
+            MiniCloud::Protocol::serializeAuthenticateRequest({license.productKey, license.deviceId});
+        QCOMPARE(authenticationPayload.status, AuthenticationEncodeResult::Status::Success);
+
+        QTcpSocket firstClientSocket;
+        firstClientSocket.connectToHost(QHostAddress::LocalHost, controller.serverPort());
+        QTRY_COMPARE(firstClientSocket.state(), QAbstractSocket::ConnectedState);
+
+        constexpr RequestId firstAuthenticationRequestId = 1001;
+        const FrameEncodeResult encodedFirstAuthentication = MiniCloud::Protocol::serializeFrame(
+            MessageType::AuthenticateRequest,
+            firstAuthenticationRequestId,
+            taskId,
+            authenticationPayload.payload);
+        QCOMPARE(encodedFirstAuthentication.status, FrameEncodeStatus::Success);
+        QCOMPARE(
+            firstClientSocket.write(encodedFirstAuthentication.encodedFrame),
+            static_cast<qint64>(encodedFirstAuthentication.encodedFrame.size()));
+        QVERIFY(firstClientSocket.waitForBytesWritten());
+
+        QTRY_VERIFY(firstClientSocket.bytesAvailable() > 0);
+        FrameParser firstAuthenticationResponseParser;
+        firstAuthenticationResponseParser.appendData(firstClientSocket.readAll());
+        const FrameParser::FrameParseResult firstAuthenticationResponse =
+            firstAuthenticationResponseParser.tryTakeFrame();
+        QCOMPARE(firstAuthenticationResponse.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(firstAuthenticationResponse.frame.header.messageType, MessageType::AuthenticateResponse);
+
+        const AuthenticateResponseDecodeResult decodedFirstAuthentication =
+            MiniCloud::Protocol::deserializeAuthenticateResponse(firstAuthenticationResponse.frame.payload);
+        QCOMPARE(decodedFirstAuthentication.status, AuthenticateResponseDecodeResult::Status::Success);
+        QCOMPARE(decodedFirstAuthentication.data.status, AuthenticationStatus::Valid);
+
+        const MiniCloud::Protocol::FileProtocolEncodeResult uploadStartPayload =
+            MiniCloud::Protocol::serializeUploadStartRequest(
+                {QStringLiteral("/Documents"), QStringLiteral("report.bin"), 5});
+        QCOMPARE(uploadStartPayload.status, MiniCloud::Protocol::FileProtocolEncodeResult::Status::Success);
+
+        constexpr RequestId firstUploadRequestId = 1002;
+        const FrameEncodeResult encodedFirstUploadStart = MiniCloud::Protocol::serializeFrame(
+            MessageType::UploadStartRequest,
+            firstUploadRequestId,
+            taskId,
+            uploadStartPayload.payload);
+        QCOMPARE(encodedFirstUploadStart.status, FrameEncodeStatus::Success);
+        QCOMPARE(
+            firstClientSocket.write(encodedFirstUploadStart.encodedFrame),
+            static_cast<qint64>(encodedFirstUploadStart.encodedFrame.size()));
+        QVERIFY(firstClientSocket.waitForBytesWritten());
+
+        QTRY_VERIFY(firstClientSocket.bytesAvailable() > 0);
+        FrameParser firstUploadReadyParser;
+        firstUploadReadyParser.appendData(firstClientSocket.readAll());
+        const FrameParser::FrameParseResult firstUploadReadyResponse =
+            firstUploadReadyParser.tryTakeFrame();
+        QCOMPARE(firstUploadReadyResponse.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(firstUploadReadyResponse.frame.header.messageType, MessageType::UploadReadyResponse);
+        QCOMPARE(firstUploadReadyResponse.frame.header.requestId, firstUploadRequestId);
+
+        const MiniCloud::Protocol::FileProtocolEncodeResult firstChunkPayload =
+            MiniCloud::Protocol::serializeFileChunk({0, QByteArrayLiteral("abc")});
+        QCOMPARE(firstChunkPayload.status, MiniCloud::Protocol::FileProtocolEncodeResult::Status::Success);
+
+        const FrameEncodeResult encodedFirstChunk = MiniCloud::Protocol::serializeFrame(
+            MessageType::FileChunk,
+            firstUploadRequestId,
+            taskId,
+            firstChunkPayload.payload);
+        QCOMPARE(encodedFirstChunk.status, FrameEncodeStatus::Success);
+        QCOMPARE(
+            firstClientSocket.write(encodedFirstChunk.encodedFrame),
+            static_cast<qint64>(encodedFirstChunk.encodedFrame.size()));
+        QVERIFY(firstClientSocket.waitForBytesWritten());
+
+        const MiniCloud::Protocol::FileProtocolEncodeResult browsePayload =
+            MiniCloud::Protocol::serializeBrowseRequest({QStringLiteral("/Documents")});
+        QCOMPARE(browsePayload.status, MiniCloud::Protocol::FileProtocolEncodeResult::Status::Success);
+
+        constexpr RequestId browseRequestId = 1003;
+        const FrameEncodeResult encodedBrowse = MiniCloud::Protocol::serializeFrame(
+            MessageType::BrowseRequest,
+            browseRequestId,
+            taskId,
+            browsePayload.payload);
+        QCOMPARE(encodedBrowse.status, FrameEncodeStatus::Success);
+        QCOMPARE(
+            firstClientSocket.write(encodedBrowse.encodedFrame),
+            static_cast<qint64>(encodedBrowse.encodedFrame.size()));
+        QVERIFY(firstClientSocket.waitForBytesWritten());
+
+        QTRY_VERIFY(firstClientSocket.bytesAvailable() > 0);
+        FrameParser browseResponseParser;
+        browseResponseParser.appendData(firstClientSocket.readAll());
+        const FrameParser::FrameParseResult browseResponse = browseResponseParser.tryTakeFrame();
+        QCOMPARE(browseResponse.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(browseResponse.frame.header.messageType, MessageType::BrowseResponse);
+        QCOMPARE(browseResponse.frame.header.requestId, browseRequestId);
+
+        const BrowseResponseDecodeResult decodedBrowse =
+            MiniCloud::Protocol::deserializeBrowseResponse(browseResponse.frame.payload);
+        QCOMPARE(decodedBrowse.status, BrowseResponseDecodeResult::Status::Success);
+        QVERIFY(decodedBrowse.data.entries.isEmpty());
+
+        firstClientSocket.disconnectFromHost();
+        QTRY_COMPARE(firstClientSocket.state(), QAbstractSocket::UnconnectedState);
+
+        const QDir documentsDirectory(QDir(storageRoot).filePath(QStringLiteral("Documents")));
+        const QString reportNativePath = documentsDirectory.filePath(QStringLiteral("report.bin"));
+        QTRY_VERIFY(!QFileInfo::exists(reportNativePath));
+        QTRY_VERIFY(documentsDirectory.entryList(
+                        QDir::NoDotAndDotDot | QDir::AllEntries | QDir::Hidden)
+                        .isEmpty());
+
+        QTcpSocket secondClientSocket;
+        secondClientSocket.connectToHost(QHostAddress::LocalHost, controller.serverPort());
+        QTRY_COMPARE(secondClientSocket.state(), QAbstractSocket::ConnectedState);
+
+        constexpr RequestId secondAuthenticationRequestId = 1004;
+        const FrameEncodeResult encodedSecondAuthentication = MiniCloud::Protocol::serializeFrame(
+            MessageType::AuthenticateRequest,
+            secondAuthenticationRequestId,
+            taskId,
+            authenticationPayload.payload);
+        QCOMPARE(encodedSecondAuthentication.status, FrameEncodeStatus::Success);
+        QCOMPARE(
+            secondClientSocket.write(encodedSecondAuthentication.encodedFrame),
+            static_cast<qint64>(encodedSecondAuthentication.encodedFrame.size()));
+        QVERIFY(secondClientSocket.waitForBytesWritten());
+
+        QTRY_VERIFY(secondClientSocket.bytesAvailable() > 0);
+        FrameParser secondAuthenticationResponseParser;
+        secondAuthenticationResponseParser.appendData(secondClientSocket.readAll());
+        const FrameParser::FrameParseResult secondAuthenticationResponse =
+            secondAuthenticationResponseParser.tryTakeFrame();
+        QCOMPARE(secondAuthenticationResponse.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(secondAuthenticationResponse.frame.header.messageType, MessageType::AuthenticateResponse);
+
+        const AuthenticateResponseDecodeResult decodedSecondAuthentication =
+            MiniCloud::Protocol::deserializeAuthenticateResponse(secondAuthenticationResponse.frame.payload);
+        QCOMPARE(decodedSecondAuthentication.status, AuthenticateResponseDecodeResult::Status::Success);
+        QCOMPARE(decodedSecondAuthentication.data.status, AuthenticationStatus::Valid);
+
+        constexpr RequestId restartedUploadRequestId = 1005;
+        const FrameEncodeResult encodedRestartedUploadStart = MiniCloud::Protocol::serializeFrame(
+            MessageType::UploadStartRequest,
+            restartedUploadRequestId,
+            taskId,
+            uploadStartPayload.payload);
+        QCOMPARE(encodedRestartedUploadStart.status, FrameEncodeStatus::Success);
+        QCOMPARE(
+            secondClientSocket.write(encodedRestartedUploadStart.encodedFrame),
+            static_cast<qint64>(encodedRestartedUploadStart.encodedFrame.size()));
+        QVERIFY(secondClientSocket.waitForBytesWritten());
+
+        QTRY_VERIFY(secondClientSocket.bytesAvailable() > 0);
+        FrameParser restartedUploadReadyParser;
+        restartedUploadReadyParser.appendData(secondClientSocket.readAll());
+        const FrameParser::FrameParseResult restartedUploadReadyResponse =
+            restartedUploadReadyParser.tryTakeFrame();
+        QCOMPARE(restartedUploadReadyResponse.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(restartedUploadReadyResponse.frame.header.messageType, MessageType::UploadReadyResponse);
+        QCOMPARE(restartedUploadReadyResponse.frame.header.requestId, restartedUploadRequestId);
+
+        const MiniCloud::Protocol::FileProtocolEncodeResult completedChunkPayload =
+            MiniCloud::Protocol::serializeFileChunk({0, QByteArrayLiteral("abcde")});
+        QCOMPARE(completedChunkPayload.status, MiniCloud::Protocol::FileProtocolEncodeResult::Status::Success);
+
+        const FrameEncodeResult encodedCompletedChunk = MiniCloud::Protocol::serializeFrame(
+            MessageType::FileChunk,
+            restartedUploadRequestId,
+            taskId,
+            completedChunkPayload.payload);
+        QCOMPARE(encodedCompletedChunk.status, FrameEncodeStatus::Success);
+        QCOMPARE(
+            secondClientSocket.write(encodedCompletedChunk.encodedFrame),
+            static_cast<qint64>(encodedCompletedChunk.encodedFrame.size()));
+        QVERIFY(secondClientSocket.waitForBytesWritten());
+
+        QTRY_VERIFY(secondClientSocket.bytesAvailable() > 0);
+        FrameParser completionResponseParser;
+        completionResponseParser.appendData(secondClientSocket.readAll());
+        const FrameParser::FrameParseResult completionResponse =
+            completionResponseParser.tryTakeFrame();
+        QCOMPARE(completionResponse.status, FrameParser::FrameParseStatus::FrameReady);
+        QCOMPARE(completionResponse.frame.header.messageType, MessageType::FileOperationResponse);
+        QCOMPARE(completionResponse.frame.header.requestId, restartedUploadRequestId);
+
+        QFile reportFile(reportNativePath);
+        QVERIFY(reportFile.open(QIODevice::ReadOnly));
+        QCOMPARE(reportFile.readAll(), QByteArrayLiteral("abcde"));
+
+        controller.stop();
+        QTRY_COMPARE(secondClientSocket.state(), QAbstractSocket::UnconnectedState);
+    }
 };
 
 QTEST_GUILESS_MAIN(ServerControllerTest)

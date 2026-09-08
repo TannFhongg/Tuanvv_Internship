@@ -382,6 +382,16 @@ add_test(
 )
 
 add_test(
+    NAME ServerControllerTest.uploadSequentialChunks_afterAuthentication_overTcp_commitsAndReturnsCorrelatedCompletion
+    COMMAND ServerControllerTest uploadSequentialChunks_afterAuthentication_overTcp_commitsAndReturnsCorrelatedCompletion
+)
+
+add_test(
+    NAME ServerControllerTest.clientDisconnect_duringUpload_discardsTemporaryFileAndAllowsCleanRestart
+    COMMAND ServerControllerTest clientDisconnect_duringUpload_discardsTemporaryFileAndAllowsCleanRestart
+)
+
+add_test(
     NAME LicenseManagerTest.initialize_missingRepository_succeeds
     COMMAND LicenseManagerTest initialize_missingRepository_succeeds
 )

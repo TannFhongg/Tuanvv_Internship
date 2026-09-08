@@ -20,6 +20,15 @@ ServerController::ServerController(QString repositoryFilePath, QString storageRo
                 m_dispatcher.handleFrame(*session, frame);
             }
         });
+
+    connect(
+        &m_tcpServer,
+        &TcpServer::clientDisconnected,
+        this,
+        [this]()
+        {
+            m_dispatcher.cancelActiveUpload();
+        });
 }
 
 MiniCloud::Server::LicenseManagerResult ServerController::initialize()
