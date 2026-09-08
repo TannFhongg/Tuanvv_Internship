@@ -266,6 +266,30 @@ add_test(
 )
 
 add_test(
+    NAME FileManagerTest.downloadSequentialChunks_readsContentInOrderAndCompletesAtExactEnd
+    COMMAND FileManagerTests
+            downloadSequentialChunks_readsContentInOrderAndCompletesAtExactEnd
+)
+
+add_test(
+    NAME FileManagerTest.beginDownload_emptyFile_completesImmediatelyWithoutChunk
+    COMMAND FileManagerTests
+            beginDownload_emptyFile_completesImmediatelyWithoutChunk
+)
+
+add_test(
+    NAME FileManagerTest.beginDownload_invalidOrNonFilePath_failsWithoutOpeningTransfer
+    COMMAND FileManagerTests
+            beginDownload_invalidOrNonFilePath_failsWithoutOpeningTransfer
+)
+
+add_test(
+    NAME FileManagerTest.beginDownload_whileAnotherDownloadIsActive_failsWithoutDisturbingOriginalTransfer
+    COMMAND FileManagerTests
+            beginDownload_whileAnotherDownloadIsActive_failsWithoutDisturbingOriginalTransfer
+)
+
+add_test(
     NAME FileManagerTest.searchCurrentDirectory_caseInsensitiveSubstring_returnsSortedDirectMatches
     COMMAND FileManagerTests
             searchCurrentDirectory_caseInsensitiveSubstring_returnsSortedDirectMatches

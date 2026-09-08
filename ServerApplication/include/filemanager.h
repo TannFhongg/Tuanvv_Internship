@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QByteArray>
+#include <QFile>
 #include <QList>
 #include <QSaveFile>
 #include <QString>
@@ -24,6 +25,15 @@ namespace MiniCloud::Server
         InvalidPath,
         NotFound,
         IoFailure
+    };
+
+    enum class FileManagerDownloadFailureReason
+    {
+        None,
+        InvalidPath,
+        NotFound,
+        IoFailure,
+        TransferInProgress
     };
 
     struct FileManagerBrowseResult
@@ -57,6 +67,25 @@ namespace MiniCloud::Server
         QString path;
     };
 
+    struct FileManagerDownloadStartResult
+    {
+        FileManagerOperationStatus status = FileManagerOperationStatus::Failed;
+        FileManagerDownloadFailureReason failureReason = FileManagerDownloadFailureReason::None;
+        QString errorMessage;
+        QString path;
+        quint64 totalSizeBytes = 0;
+        bool completed = false;
+    };
+
+    struct FileManagerDownloadChunkResult
+    {
+        FileManagerOperationStatus status = FileManagerOperationStatus::Failed;
+        QString errorMessage;
+        quint64 offset = 0;
+        QByteArray data;
+        bool completed = false;
+    };
+
     class FileManager
     {
     public:
@@ -80,14 +109,26 @@ namespace MiniCloud::Server
 
         void cancelUpload();
 
+        FileManagerDownloadStartResult beginDownload(const QString &logicalPath);
+
+        FileManagerDownloadChunkResult readNextDownloadChunk();
+
     private:
         void cancelActiveUpload();
 
+        void cancelActiveDownload();
+
         QString m_storageRoot;
+
         std::unique_ptr<QSaveFile> m_activeUploadFile;
         QString m_activeUploadLogicalPath;
         QStringList m_activeUploadTemporaryFilesystemPaths;
         quint64 m_activeUploadTotalSizeBytes = 0;
         quint64 m_activeUploadReceivedBytes = 0;
+
+        std::unique_ptr<QFile> m_activeDownloadFile;
+        QString m_activeDownloadLogicalPath;
+        quint64 m_activeDownloadTotalSizeBytes = 0;
+        quint64 m_activeDownloadReadBytes = 0;
     };
 }

@@ -11,7 +11,7 @@
 
 namespace
 {
-    constexpr qsizetype maximumUploadChunkSize = 64 * 1024;
+    constexpr qsizetype maximumTransferChunkSize = 64 * 1024;
 
     bool isCanonicalLogicalPath(const QString &logicalPath)
     {
@@ -524,7 +524,7 @@ namespace MiniCloud::Server
             return result;
         }
 
-        if (bytes.size() > maximumUploadChunkSize)
+        if (bytes.size() > maximumTransferChunkSize)
         {
             result.errorMessage = QStringLiteral("Upload chunk exceeds the 64 KiB limit.");
             cancelActiveUpload();
@@ -576,6 +576,119 @@ namespace MiniCloud::Server
         cancelActiveUpload();
     }
 
+    FileManagerDownloadStartResult FileManager::beginDownload(const QString &logicalPath)
+    {
+        FileManagerDownloadStartResult result;
+
+        if (m_activeDownloadFile)
+        {
+            result.failureReason = FileManagerDownloadFailureReason::TransferInProgress;
+            result.errorMessage = QStringLiteral("A download is already in progress.");
+            return result;
+        }
+
+        if (!isCanonicalLogicalPath(logicalPath) || logicalPath == QStringLiteral("/"))
+        {
+            result.failureReason = FileManagerDownloadFailureReason::InvalidPath;
+            result.errorMessage = QStringLiteral("Logical path must identify a file.");
+            return result;
+        }
+
+        const QFileInfo storageRootInfo(m_storageRoot);
+
+        if (!storageRootInfo.exists() || !storageRootInfo.isDir())
+        {
+            result.failureReason = FileManagerDownloadFailureReason::IoFailure;
+            result.errorMessage = QStringLiteral("Storage root is not an existing directory.");
+            return result;
+        }
+
+        const QString filesystemPath = QDir(m_storageRoot).filePath(logicalPath.mid(1));
+        const QFileInfo sourceInfo(filesystemPath);
+
+        if (!sourceInfo.exists() || !sourceInfo.isFile())
+        {
+            result.failureReason = FileManagerDownloadFailureReason::NotFound;
+            result.errorMessage = QStringLiteral("Logical path is not an existing file.");
+            return result;
+        }
+
+        auto downloadFile = std::make_unique<QFile>(filesystemPath);
+
+        if (!downloadFile->open(QIODevice::ReadOnly))
+        {
+            result.failureReason = FileManagerDownloadFailureReason::IoFailure;
+            result.errorMessage = QStringLiteral("Failed to open file for download.");
+            return result;
+        }
+
+        result.path = logicalPath;
+        result.totalSizeBytes = static_cast<quint64>(sourceInfo.size());
+
+        if (result.totalSizeBytes == 0)
+        {
+            result.status = FileManagerOperationStatus::Success;
+            result.completed = true;
+            return result;
+        }
+
+        m_activeDownloadFile = std::move(downloadFile);
+        m_activeDownloadLogicalPath = logicalPath;
+        m_activeDownloadTotalSizeBytes = result.totalSizeBytes;
+        m_activeDownloadReadBytes = 0;
+        result.status = FileManagerOperationStatus::Success;
+        return result;
+    }
+
+    FileManagerDownloadChunkResult FileManager::readNextDownloadChunk()
+    {
+        FileManagerDownloadChunkResult result;
+
+        if (!m_activeDownloadFile)
+        {
+            result.errorMessage = QStringLiteral("No download is in progress.");
+            return result;
+        }
+
+        const quint64 remainingBytes = m_activeDownloadTotalSizeBytes - m_activeDownloadReadBytes;
+
+        const qsizetype readSize = static_cast<qsizetype>(
+            std::min<quint64>(static_cast<quint64>(maximumTransferChunkSize), remainingBytes));
+
+        const QByteArray data = m_activeDownloadFile->read(readSize);
+
+        if (data.isEmpty() && remainingBytes > 0)
+        {
+            result.errorMessage = QStringLiteral("Failed to read the next download chunk.");
+            cancelActiveDownload();
+            return result;
+        }
+
+        result.offset = m_activeDownloadReadBytes;
+        result.data = data;
+        m_activeDownloadReadBytes += static_cast<quint64>(data.size());
+
+        if (m_activeDownloadReadBytes < m_activeDownloadTotalSizeBytes)
+        {
+            if (m_activeDownloadFile->atEnd())
+            {
+                result.errorMessage = QStringLiteral("Downloaded file became shorter than its declared size.");
+                result.data.clear();
+                result.offset = 0;
+                cancelActiveDownload();
+                return result;
+            }
+
+            result.status = FileManagerOperationStatus::Success;
+            return result;
+        }
+
+        cancelActiveDownload();
+        result.status = FileManagerOperationStatus::Success;
+        result.completed = true;
+        return result;
+    }
+
     void FileManager::cancelActiveUpload()
     {
         m_activeUploadFile.reset();
@@ -583,5 +696,13 @@ namespace MiniCloud::Server
         m_activeUploadTemporaryFilesystemPaths.clear();
         m_activeUploadTotalSizeBytes = 0;
         m_activeUploadReceivedBytes = 0;
+    }
+
+    void FileManager::cancelActiveDownload()
+    {
+        m_activeDownloadFile.reset();
+        m_activeDownloadLogicalPath.clear();
+        m_activeDownloadTotalSizeBytes = 0;
+        m_activeDownloadReadBytes = 0;
     }
 }

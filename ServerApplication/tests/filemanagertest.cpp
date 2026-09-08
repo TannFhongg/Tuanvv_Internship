@@ -1682,6 +1682,232 @@ private slots:
         QVERIFY(!secondRetryResult.completed);
         QCOMPARE(secondRetryResult.path, QStringLiteral("/Documents/second.bin"));
     }
+
+    void downloadSequentialChunks_readsContentInOrderAndCompletesAtExactEnd()
+    {
+        using namespace MiniCloud::Server;
+
+        constexpr qsizetype maximumChunkSize = 64 * 1024;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QString largeFilePath = QDir(storageRoot).filePath(QStringLiteral("Documents/large.bin"));
+        const QByteArray expectedContent = QByteArray(maximumChunkSize, 'a') + QByteArrayLiteral("z");
+        QFile largeFile(largeFilePath);
+        QVERIFY(largeFile.open(QIODevice::WriteOnly));
+        QCOMPARE(largeFile.write(expectedContent), static_cast<qint64>(expectedContent.size()));
+        largeFile.close();
+
+        FileManager manager(storageRoot);
+
+        const FileManagerDownloadStartResult startResult =
+            manager.beginDownload(QStringLiteral("/Documents/large.bin"));
+
+        QCOMPARE(startResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(startResult.errorMessage.isEmpty());
+        QCOMPARE(startResult.path, QStringLiteral("/Documents/large.bin"));
+        QCOMPARE(startResult.totalSizeBytes, quint64{65537});
+        QVERIFY(!startResult.completed);
+
+        const FileManagerDownloadChunkResult firstChunkResult = manager.readNextDownloadChunk();
+
+        QCOMPARE(firstChunkResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(firstChunkResult.errorMessage.isEmpty());
+        QCOMPARE(firstChunkResult.offset, quint64{0});
+        QCOMPARE(firstChunkResult.data.size(), maximumChunkSize);
+        QCOMPARE(firstChunkResult.data, expectedContent.left(maximumChunkSize));
+        QVERIFY(!firstChunkResult.completed);
+
+        const FileManagerDownloadChunkResult finalChunkResult = manager.readNextDownloadChunk();
+
+        QCOMPARE(finalChunkResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(finalChunkResult.errorMessage.isEmpty());
+        QCOMPARE(finalChunkResult.offset, quint64{65536});
+        QCOMPARE(finalChunkResult.data, QByteArrayLiteral("z"));
+        QVERIFY(finalChunkResult.completed);
+        QCOMPARE(firstChunkResult.data + finalChunkResult.data, expectedContent);
+    }
+
+    void beginDownload_emptyFile_completesImmediatelyWithoutChunk()
+    {
+        using namespace MiniCloud::Server;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QString emptyFilePath = QDir(storageRoot).filePath(QStringLiteral("Documents/empty.bin"));
+        QFile emptyFile(emptyFilePath);
+        QVERIFY(emptyFile.open(QIODevice::WriteOnly));
+        emptyFile.close();
+
+        FileManager manager(storageRoot);
+
+        const FileManagerDownloadStartResult startResult = manager.beginDownload(QStringLiteral("/Documents/empty.bin"));
+
+        QCOMPARE(startResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(startResult.errorMessage.isEmpty());
+        QCOMPARE(startResult.path, QStringLiteral("/Documents/empty.bin"));
+        QCOMPARE(startResult.totalSizeBytes, quint64{0});
+        QVERIFY(startResult.completed);
+
+        const FileManagerDownloadChunkResult chunkResult = manager.readNextDownloadChunk();
+
+        QCOMPARE(chunkResult.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!chunkResult.errorMessage.isEmpty());
+        QCOMPARE(chunkResult.offset, quint64{0});
+        QVERIFY(chunkResult.data.isEmpty());
+        QVERIFY(!chunkResult.completed);
+
+        QVERIFY(QFileInfo(emptyFilePath).isFile());
+        QCOMPARE(QFileInfo(emptyFilePath).size(), qint64{0});
+    }
+
+    void beginDownload_invalidOrNonFilePath_failsWithoutOpeningTransfer_data()
+    {
+        QTest::addColumn<QString>("logicalPath");
+
+        QTest::newRow("empty-path") << QString();
+        QTest::newRow("traversal-path") << QStringLiteral("/../outside");
+        QTest::newRow("noncanonical-path") << QStringLiteral("/Documents/..");
+        QTest::newRow("missing-path") << QStringLiteral("/Documents/missing.bin");
+        QTest::newRow("directory-path") << QStringLiteral("/Documents/Folder");
+    }
+
+    void beginDownload_invalidOrNonFilePath_failsWithoutOpeningTransfer()
+    {
+        using namespace MiniCloud::Server;
+
+        QFETCH(QString, logicalPath);
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        const QString outsideRoot = temporaryDirectory.filePath(QStringLiteral("outside"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents/Folder"))));
+        QVERIFY(QDir().mkpath(outsideRoot));
+
+        const QString validFilePath = QDir(storageRoot).filePath(QStringLiteral("Documents/valid.bin"));
+        QFile validFile(validFilePath);
+        QVERIFY(validFile.open(QIODevice::WriteOnly));
+        QCOMPARE(validFile.write("valid"), qint64{5});
+        validFile.close();
+
+        const QString outsideFilePath = QDir(outsideRoot).filePath(QStringLiteral("secret.bin"));
+        QFile outsideFile(outsideFilePath);
+        QVERIFY(outsideFile.open(QIODevice::WriteOnly));
+        QCOMPARE(outsideFile.write("secret"), qint64{6});
+        outsideFile.close();
+
+        FileManager manager(storageRoot);
+
+        const FileManagerDownloadStartResult invalidResult = manager.beginDownload(logicalPath);
+
+        QCOMPARE(invalidResult.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!invalidResult.errorMessage.isEmpty());
+        QVERIFY(invalidResult.path.isEmpty());
+        QCOMPARE(invalidResult.totalSizeBytes, quint64{0});
+        QVERIFY(!invalidResult.completed);
+
+        const FileManagerDownloadChunkResult chunkResult = manager.readNextDownloadChunk();
+
+        QCOMPARE(chunkResult.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!chunkResult.errorMessage.isEmpty());
+        QCOMPARE(chunkResult.offset, quint64{0});
+        QVERIFY(chunkResult.data.isEmpty());
+        QVERIFY(!chunkResult.completed);
+
+        QVERIFY(QFileInfo(validFilePath).isFile());
+        QFile unchangedValidFile(validFilePath);
+        QVERIFY(unchangedValidFile.open(QIODevice::ReadOnly));
+        QCOMPARE(unchangedValidFile.readAll(), QByteArrayLiteral("valid"));
+        QVERIFY(QFileInfo(QDir(storageRoot).filePath(QStringLiteral("Documents/Folder"))).isDir());
+        QVERIFY(QFileInfo(outsideFilePath).isFile());
+
+        const FileManagerDownloadStartResult validResult =
+            manager.beginDownload(QStringLiteral("/Documents/valid.bin"));
+
+        QCOMPARE(validResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(validResult.errorMessage.isEmpty());
+        QCOMPARE(validResult.path, QStringLiteral("/Documents/valid.bin"));
+        QCOMPARE(validResult.totalSizeBytes, quint64{5});
+        QVERIFY(!validResult.completed);
+    }
+
+    void beginDownload_whileAnotherDownloadIsActive_failsWithoutDisturbingOriginalTransfer()
+    {
+        using namespace MiniCloud::Server;
+
+        constexpr qsizetype maximumChunkSize = 64 * 1024;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QByteArray firstFileContent = QByteArray(maximumChunkSize, 'a') + QByteArrayLiteral("z");
+
+        const QString firstFilePath = QDir(storageRoot).filePath(QStringLiteral("Documents/first.bin"));
+        QFile firstFile(firstFilePath);
+        QVERIFY(firstFile.open(QIODevice::WriteOnly));
+        QCOMPARE(firstFile.write(firstFileContent), static_cast<qint64>(firstFileContent.size()));
+        firstFile.close();
+
+        const QString secondFilePath = QDir(storageRoot).filePath(QStringLiteral("Documents/second.bin"));
+        QFile secondFile(secondFilePath);
+        QVERIFY(secondFile.open(QIODevice::WriteOnly));
+        QCOMPARE(secondFile.write("second"), qint64{6});
+        secondFile.close();
+
+        FileManager manager(storageRoot);
+
+        const FileManagerDownloadStartResult firstStartResult =
+            manager.beginDownload(QStringLiteral("/Documents/first.bin"));
+
+        QCOMPARE(firstStartResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(!firstStartResult.completed);
+
+        const FileManagerDownloadChunkResult firstChunkResult = manager.readNextDownloadChunk();
+
+        QCOMPARE(firstChunkResult.status, FileManagerOperationStatus::Success);
+        QCOMPARE(firstChunkResult.offset, quint64{0});
+        QCOMPARE(firstChunkResult.data, firstFileContent.left(maximumChunkSize));
+        QVERIFY(!firstChunkResult.completed);
+
+        const FileManagerDownloadStartResult secondStartWhileFirstIsActive =
+            manager.beginDownload(QStringLiteral("/Documents/second.bin"));
+
+        QCOMPARE(secondStartWhileFirstIsActive.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!secondStartWhileFirstIsActive.errorMessage.isEmpty());
+        QVERIFY(secondStartWhileFirstIsActive.path.isEmpty());
+        QCOMPARE(secondStartWhileFirstIsActive.totalSizeBytes, quint64{0});
+        QVERIFY(!secondStartWhileFirstIsActive.completed);
+
+        const FileManagerDownloadChunkResult finalFirstChunkResult = manager.readNextDownloadChunk();
+
+        QCOMPARE(finalFirstChunkResult.status, FileManagerOperationStatus::Success);
+        QCOMPARE(finalFirstChunkResult.offset, static_cast<quint64>(maximumChunkSize));
+        QCOMPARE(finalFirstChunkResult.data, QByteArrayLiteral("z"));
+        QVERIFY(finalFirstChunkResult.completed);
+        QCOMPARE(firstChunkResult.data + finalFirstChunkResult.data, firstFileContent);
+
+        const FileManagerDownloadStartResult secondStartResult =
+            manager.beginDownload(QStringLiteral("/Documents/second.bin"));
+
+        QCOMPARE(secondStartResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(secondStartResult.errorMessage.isEmpty());
+        QCOMPARE(secondStartResult.path, QStringLiteral("/Documents/second.bin"));
+        QCOMPARE(secondStartResult.totalSizeBytes, quint64{6});
+        QVERIFY(!secondStartResult.completed);
+    }
 };
 
 QTEST_MAIN(FileManagerTest)
