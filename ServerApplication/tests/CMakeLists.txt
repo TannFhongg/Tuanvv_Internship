@@ -411,6 +411,11 @@ add_test(
 )
 
 add_test(
+    NAME ServerControllerTest.downloadRequest_afterAuthentication_overTcp_returnsStartChunksAndCompletion
+    COMMAND ServerControllerTest downloadRequest_afterAuthentication_overTcp_returnsStartChunksAndCompletion
+)
+
+add_test(
     NAME ServerControllerTest.clientDisconnect_duringUpload_discardsTemporaryFileAndAllowsCleanRestart
     COMMAND ServerControllerTest clientDisconnect_duringUpload_discardsTemporaryFileAndAllowsCleanRestart
 )
