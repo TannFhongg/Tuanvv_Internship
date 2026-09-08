@@ -212,6 +212,60 @@ add_test(
 )
 
 add_test(
+    NAME FileManagerTest.uploadSequentialChunks_commitsFileOnlyAfterExactFinalChunk
+    COMMAND FileManagerTests
+            uploadSequentialChunks_commitsFileOnlyAfterExactFinalChunk
+)
+
+add_test(
+    NAME FileManagerTest.uploadChunk_withUnexpectedOffset_failsAndAllowsCleanRestart
+    COMMAND FileManagerTests
+            uploadChunk_withUnexpectedOffset_failsAndAllowsCleanRestart
+)
+
+add_test(
+    NAME FileManagerTest.uploadChunk_exceedingDeclaredSize_failsAndAllowsCleanRestart
+    COMMAND FileManagerTests
+            uploadChunk_exceedingDeclaredSize_failsAndAllowsCleanRestart
+)
+
+add_test(
+    NAME FileManagerTest.beginZeroByteUpload_commitsEmptyFileImmediately
+    COMMAND FileManagerTests
+            beginZeroByteUpload_commitsEmptyFileImmediately
+)
+
+add_test(
+    NAME FileManagerTest.uploadChunk_withoutActiveUpload_failsWithoutCreatingFile
+    COMMAND FileManagerTests
+            uploadChunk_withoutActiveUpload_failsWithoutCreatingFile
+)
+
+add_test(
+    NAME FileManagerTest.uploadChunk_largerThan64KiB_failsAndAllowsCleanRestart
+    COMMAND FileManagerTests
+            uploadChunk_largerThan64KiB_failsAndAllowsCleanRestart
+)
+
+add_test(
+    NAME FileManagerTest.beginUpload_existingFileOrDirectory_failsWithoutOverwriting
+    COMMAND FileManagerTests
+            beginUpload_existingFileOrDirectory_failsWithoutOverwriting
+)
+
+add_test(
+    NAME FileManagerTest.beginUpload_invalidDestinationOrFileName_failsWithoutCreatingTemporaryFile
+    COMMAND FileManagerTests
+            beginUpload_invalidDestinationOrFileName_failsWithoutCreatingTemporaryFile
+)
+
+add_test(
+    NAME FileManagerTest.beginUpload_whileAnotherUploadIsActive_failsWithoutDisturbingOriginalTransfer
+    COMMAND FileManagerTests
+            beginUpload_whileAnotherUploadIsActive_failsWithoutDisturbingOriginalTransfer
+)
+
+add_test(
     NAME FileManagerTest.searchCurrentDirectory_caseInsensitiveSubstring_returnsSortedDirectMatches
     COMMAND FileManagerTests
             searchCurrentDirectory_caseInsensitiveSubstring_returnsSortedDirectMatches

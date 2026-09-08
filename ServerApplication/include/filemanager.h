@@ -1,7 +1,12 @@
 #pragma once
 
+#include <QByteArray>
 #include <QList>
+#include <QSaveFile>
 #include <QString>
+#include <QStringList>
+
+#include <memory>
 
 #include "fileprotocol.h"
 
@@ -36,6 +41,22 @@ namespace MiniCloud::Server
         QString path;
     };
 
+    struct FileManagerUploadStartResult
+    {
+        FileManagerOperationStatus status = FileManagerOperationStatus::Failed;
+        QString errorMessage;
+        bool completed = false;
+        QString path;
+    };
+
+    struct FileManagerUploadChunkResult
+    {
+        FileManagerOperationStatus status = FileManagerOperationStatus::Failed;
+        QString errorMessage;
+        bool completed = false;
+        QString path;
+    };
+
     class FileManager
     {
     public:
@@ -53,7 +74,20 @@ namespace MiniCloud::Server
 
         FileManagerOperationResult remove(const QString &logicalPath) const;
 
+        FileManagerUploadStartResult beginUpload(const QString &destinationDirectoryPath, const QString &fileName, quint64 totalSizeBytes);
+
+        FileManagerUploadChunkResult appendUploadChunk(quint64 offset, const QByteArray &bytes);
+
+        void cancelUpload();
+
     private:
+        void cancelActiveUpload();
+
         QString m_storageRoot;
+        std::unique_ptr<QSaveFile> m_activeUploadFile;
+        QString m_activeUploadLogicalPath;
+        QStringList m_activeUploadTemporaryFilesystemPaths;
+        quint64 m_activeUploadTotalSizeBytes = 0;
+        quint64 m_activeUploadReceivedBytes = 0;
     };
 }

@@ -11,6 +11,8 @@
 
 namespace
 {
+    constexpr qsizetype maximumUploadChunkSize = 64 * 1024;
+
     bool isCanonicalLogicalPath(const QString &logicalPath)
     {
         if (logicalPath == QStringLiteral("/"))
@@ -93,6 +95,11 @@ namespace MiniCloud::Server
 
         for (const QFileInfo &filesystemEntry : filesystemEntries)
         {
+            if (m_activeUploadTemporaryFilesystemPaths.contains(filesystemEntry.absoluteFilePath()))
+            {
+                continue;
+            }
+
             MiniCloud::Protocol::FileEntryData entry;
             entry.name = filesystemEntry.fileName();
             entry.path = logicalPath == QStringLiteral("/") ? QStringLiteral("/") + entry.name : logicalPath + QLatin1Char('/') + entry.name;
@@ -394,5 +401,187 @@ namespace MiniCloud::Server
         result.path = logicalPath;
         result.status = FileManagerOperationStatus::Success;
         return result;
+    }
+
+    FileManagerUploadStartResult FileManager::beginUpload(const QString &destinationDirectoryPath,
+                                                          const QString &fileName,
+                                                          quint64 totalSizeBytes)
+    {
+        FileManagerUploadStartResult result;
+
+        if (m_activeUploadFile)
+        {
+            result.errorMessage = QStringLiteral("An upload is already in progress.");
+            return result;
+        }
+
+        if (!isCanonicalLogicalPath(destinationDirectoryPath))
+        {
+            result.errorMessage = QStringLiteral("Destination logical path must be canonical.");
+            return result;
+        }
+
+        if (!isValidLeafName(fileName))
+        {
+            result.errorMessage = QStringLiteral("File name is invalid.");
+            return result;
+        }
+
+        const QFileInfo storageRootInfo(m_storageRoot);
+
+        if (!storageRootInfo.exists() || !storageRootInfo.isDir())
+        {
+            result.errorMessage = QStringLiteral("Storage root is not an existing directory.");
+            return result;
+        }
+
+        const QString destinationFilesystemPath = QDir(m_storageRoot).filePath(destinationDirectoryPath.mid(1));
+        const QFileInfo destinationDirectoryInfo(destinationFilesystemPath);
+
+        if (!destinationDirectoryInfo.exists() || !destinationDirectoryInfo.isDir())
+        {
+            result.errorMessage = QStringLiteral("Destination logical path is not an existing directory.");
+            return result;
+        }
+
+        const QString finalFilesystemPath = QDir(destinationFilesystemPath).filePath(fileName);
+
+        if (QFileInfo::exists(finalFilesystemPath))
+        {
+            result.errorMessage = QStringLiteral("Destination entry already exists.");
+            return result;
+        }
+
+        const QDir destinationDirectory(destinationFilesystemPath);
+
+        const QStringList entryNamesBeforeUpload = destinationDirectory.entryList(
+            QDir::NoDotAndDotDot | QDir::AllEntries | QDir::Hidden, QDir::NoSort);
+
+        auto uploadFile = std::make_unique<QSaveFile>(finalFilesystemPath);
+
+        if (!uploadFile->open(QIODevice::WriteOnly))
+        {
+            result.errorMessage = QStringLiteral("Failed to create temporary upload file.");
+            return result;
+        }
+
+        m_activeUploadLogicalPath = destinationDirectoryPath == QStringLiteral("/")
+                                        ? QStringLiteral("/") + fileName
+                                        : destinationDirectoryPath + QLatin1Char('/') + fileName;
+
+        m_activeUploadTotalSizeBytes = totalSizeBytes;
+        m_activeUploadReceivedBytes = 0;
+        m_activeUploadFile = std::move(uploadFile);
+
+        if (totalSizeBytes == 0)
+        {
+            const QString completedLogicalPath = m_activeUploadLogicalPath;
+
+            if (!m_activeUploadFile->commit())
+            {
+                result.errorMessage = QStringLiteral("Failed to commit uploaded file.");
+                cancelActiveUpload();
+                return result;
+            }
+
+            cancelActiveUpload();
+            result.status = FileManagerOperationStatus::Success;
+            result.completed = true;
+            result.path = completedLogicalPath;
+            return result;
+        }
+
+        const QFileInfoList entriesAfterStartingUpload = destinationDirectory.entryInfoList(
+            QDir::NoDotAndDotDot | QDir::AllEntries | QDir::Hidden, QDir::NoSort);
+
+        for (const QFileInfo &entry : entriesAfterStartingUpload)
+        {
+            if (!entryNamesBeforeUpload.contains(entry.fileName()))
+            {
+                m_activeUploadTemporaryFilesystemPaths.append(entry.absoluteFilePath());
+            }
+        }
+
+        result.status = FileManagerOperationStatus::Success;
+        result.path = m_activeUploadLogicalPath;
+        return result;
+    }
+
+    FileManagerUploadChunkResult FileManager::appendUploadChunk(quint64 offset, const QByteArray &bytes)
+    {
+        FileManagerUploadChunkResult result;
+
+        if (!m_activeUploadFile)
+        {
+            result.errorMessage = QStringLiteral("No upload is in progress.");
+            return result;
+        }
+
+        if (offset != m_activeUploadReceivedBytes)
+        {
+            result.errorMessage = QStringLiteral("Upload chunk offset is invalid.");
+            cancelActiveUpload();
+            return result;
+        }
+
+        if (bytes.size() > maximumUploadChunkSize)
+        {
+            result.errorMessage = QStringLiteral("Upload chunk exceeds the 64 KiB limit.");
+            cancelActiveUpload();
+            return result;
+        }
+
+        const quint64 byteCount = static_cast<quint64>(bytes.size());
+
+        if (byteCount > m_activeUploadTotalSizeBytes - m_activeUploadReceivedBytes)
+        {
+            result.errorMessage = QStringLiteral("Upload chunk exceeds the declared file size.");
+            cancelActiveUpload();
+            return result;
+        }
+
+        if (m_activeUploadFile->write(bytes) != bytes.size())
+        {
+            result.errorMessage = QStringLiteral("Failed to write upload chunk.");
+            cancelActiveUpload();
+            return result;
+        }
+
+        m_activeUploadReceivedBytes += byteCount;
+
+        if (m_activeUploadReceivedBytes < m_activeUploadTotalSizeBytes)
+        {
+            result.status = FileManagerOperationStatus::Success;
+            return result;
+        }
+
+        const QString completedLogicalPath = m_activeUploadLogicalPath;
+
+        if (!m_activeUploadFile->commit())
+        {
+            result.errorMessage = QStringLiteral("Failed to commit uploaded file.");
+            cancelActiveUpload();
+            return result;
+        }
+
+        cancelActiveUpload();
+        result.status = FileManagerOperationStatus::Success;
+        result.completed = true;
+        result.path = completedLogicalPath;
+        return result;
+    }
+
+    void FileManager::cancelUpload()
+    {
+        cancelActiveUpload();
+    }
+
+    void FileManager::cancelActiveUpload()
+    {
+        m_activeUploadFile.reset();
+        m_activeUploadLogicalPath.clear();
+        m_activeUploadTemporaryFilesystemPaths.clear();
+        m_activeUploadTotalSizeBytes = 0;
+        m_activeUploadReceivedBytes = 0;
     }
 }

@@ -1251,6 +1251,437 @@ private slots:
         QVERIFY(QFileInfo(reportNativePath).isFile());
         QVERIFY(QFileInfo(outsideSecretPath).isFile());
     }
+
+    void uploadSequentialChunks_commitsFileOnlyAfterExactFinalChunk()
+    {
+        using namespace MiniCloud::Server;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QString finalNativePath = QDir(storageRoot).filePath(QStringLiteral("Documents/report.bin"));
+        FileManager manager(storageRoot);
+
+        const FileManagerUploadStartResult startResult = manager.beginUpload(QStringLiteral("/Documents"), QStringLiteral("report.bin"), 5);
+
+        QCOMPARE(startResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(startResult.errorMessage.isEmpty());
+        QCOMPARE(startResult.path, QStringLiteral("/Documents/report.bin"));
+        QVERIFY(!QFileInfo::exists(finalNativePath));
+
+        const FileManagerUploadChunkResult firstChunkResult = manager.appendUploadChunk(0, QByteArrayLiteral("abc"));
+
+        QCOMPARE(firstChunkResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(firstChunkResult.errorMessage.isEmpty());
+        QVERIFY(!firstChunkResult.completed);
+        QVERIFY(firstChunkResult.path.isEmpty());
+        QVERIFY(!QFileInfo::exists(finalNativePath));
+
+        const FileManagerBrowseResult browseResult = manager.browse(QStringLiteral("/Documents"));
+        QCOMPARE(browseResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(browseResult.entries.isEmpty());
+
+        const FileManagerUploadChunkResult finalChunkResult = manager.appendUploadChunk(3, QByteArrayLiteral("de"));
+
+        QCOMPARE(finalChunkResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(finalChunkResult.errorMessage.isEmpty());
+        QVERIFY(finalChunkResult.completed);
+        QCOMPARE(finalChunkResult.path, QStringLiteral("/Documents/report.bin"));
+
+        QVERIFY(QFileInfo(finalNativePath).isFile());
+
+        QFile finalFile(finalNativePath);
+        QVERIFY(finalFile.open(QIODevice::ReadOnly));
+        QCOMPARE(finalFile.readAll(), QByteArrayLiteral("abcde"));
+    }
+
+    void uploadChunk_withUnexpectedOffset_failsAndAllowsCleanRestart()
+    {
+        using namespace MiniCloud::Server;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QString finalNativePath = QDir(storageRoot).filePath(QStringLiteral("Documents/report.bin"));
+        FileManager manager(storageRoot);
+
+        const FileManagerUploadStartResult startResult = manager.beginUpload(QStringLiteral("/Documents"), QStringLiteral("report.bin"), 5);
+
+        QCOMPARE(startResult.status, FileManagerOperationStatus::Success);
+
+        const FileManagerUploadChunkResult invalidChunkResult = manager.appendUploadChunk(1, QByteArrayLiteral("abc"));
+
+        QCOMPARE(invalidChunkResult.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!invalidChunkResult.errorMessage.isEmpty());
+        QVERIFY(!invalidChunkResult.completed);
+        QVERIFY(invalidChunkResult.path.isEmpty());
+        QVERIFY(!QFileInfo::exists(finalNativePath));
+
+        const FileManagerBrowseResult browseResult = manager.browse(QStringLiteral("/Documents"));
+        QCOMPARE(browseResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(browseResult.entries.isEmpty());
+
+        const FileManagerUploadStartResult restartResult = manager.beginUpload(QStringLiteral("/Documents"), QStringLiteral("report.bin"), 2);
+
+        QCOMPARE(restartResult.status, FileManagerOperationStatus::Success);
+
+        const FileManagerUploadChunkResult completedResult = manager.appendUploadChunk(0, QByteArrayLiteral("ok"));
+
+        QCOMPARE(completedResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(completedResult.completed);
+        QCOMPARE(completedResult.path, QStringLiteral("/Documents/report.bin"));
+
+        QFile finalFile(finalNativePath);
+        QVERIFY(finalFile.open(QIODevice::ReadOnly));
+        QCOMPARE(finalFile.readAll(), QByteArrayLiteral("ok"));
+    }
+
+    void uploadChunk_exceedingDeclaredSize_failsAndAllowsCleanRestart()
+    {
+        using namespace MiniCloud::Server;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QString finalNativePath = QDir(storageRoot).filePath(QStringLiteral("Documents/report.bin"));
+        FileManager manager(storageRoot);
+
+        const FileManagerUploadStartResult startResult = manager.beginUpload(QStringLiteral("/Documents"), QStringLiteral("report.bin"), 3);
+
+        QCOMPARE(startResult.status, FileManagerOperationStatus::Success);
+
+        const FileManagerUploadChunkResult result = manager.appendUploadChunk(0, QByteArrayLiteral("four"));
+
+        QCOMPARE(result.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!result.errorMessage.isEmpty());
+        QVERIFY(!result.completed);
+        QVERIFY(result.path.isEmpty());
+        QVERIFY(!QFileInfo::exists(finalNativePath));
+
+        const FileManagerBrowseResult browseResult = manager.browse(QStringLiteral("/Documents"));
+        QCOMPARE(browseResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(browseResult.entries.isEmpty());
+
+        const FileManagerUploadStartResult restartResult = manager.beginUpload(QStringLiteral("/Documents"), QStringLiteral("report.bin"), 3);
+
+        QCOMPARE(restartResult.status, FileManagerOperationStatus::Success);
+
+        const FileManagerUploadChunkResult completedResult = manager.appendUploadChunk(0, QByteArrayLiteral("abc"));
+
+        QCOMPARE(completedResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(completedResult.completed);
+        QCOMPARE(completedResult.path, QStringLiteral("/Documents/report.bin"));
+
+        QFile finalFile(finalNativePath);
+        QVERIFY(finalFile.open(QIODevice::ReadOnly));
+        QCOMPARE(finalFile.readAll(), QByteArrayLiteral("abc"));
+    }
+
+    void beginZeroByteUpload_commitsEmptyFileImmediately()
+    {
+        using namespace MiniCloud::Server;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QString finalNativePath = QDir(storageRoot).filePath(QStringLiteral("Documents/empty.bin"));
+        FileManager manager(storageRoot);
+
+        const FileManagerUploadStartResult result = manager.beginUpload(QStringLiteral("/Documents"), QStringLiteral("empty.bin"), 0);
+
+        QCOMPARE(result.status, FileManagerOperationStatus::Success);
+        QVERIFY(result.errorMessage.isEmpty());
+        QVERIFY(result.completed);
+        QCOMPARE(result.path, QStringLiteral("/Documents/empty.bin"));
+
+        QVERIFY(QFileInfo(finalNativePath).isFile());
+        QCOMPARE(QFileInfo(finalNativePath).size(), qint64{0});
+
+        const FileManagerBrowseResult browseResult = manager.browse(QStringLiteral("/Documents"));
+        QCOMPARE(browseResult.status, FileManagerOperationStatus::Success);
+        QCOMPARE(browseResult.entries.size(), 1);
+        QCOMPARE(browseResult.entries.constFirst().name, QStringLiteral("empty.bin"));
+        QCOMPARE(browseResult.entries.constFirst().path, QStringLiteral("/Documents/empty.bin"));
+
+        const FileManagerUploadChunkResult unexpectedChunkResult = manager.appendUploadChunk(0, QByteArray());
+
+        QCOMPARE(unexpectedChunkResult.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!unexpectedChunkResult.errorMessage.isEmpty());
+        QVERIFY(!unexpectedChunkResult.completed);
+        QVERIFY(unexpectedChunkResult.path.isEmpty());
+    }
+
+    void uploadChunk_withoutActiveUpload_failsWithoutCreatingFile()
+    {
+        using namespace MiniCloud::Server;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        FileManager manager(storageRoot);
+
+        const FileManagerUploadChunkResult result = manager.appendUploadChunk(0, QByteArrayLiteral("data"));
+
+        QCOMPARE(result.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!result.errorMessage.isEmpty());
+        QVERIFY(!result.completed);
+        QVERIFY(result.path.isEmpty());
+
+        const FileManagerBrowseResult browseResult = manager.browse(QStringLiteral("/Documents"));
+        QCOMPARE(browseResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(browseResult.entries.isEmpty());
+    }
+
+    void uploadChunk_largerThan64KiB_failsAndAllowsCleanRestart()
+    {
+        using namespace MiniCloud::Server;
+
+        constexpr qsizetype maximumChunkSize = 64 * 1024;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QString finalNativePath = QDir(storageRoot).filePath(QStringLiteral("Documents/large.bin"));
+        FileManager manager(storageRoot);
+
+        const FileManagerUploadStartResult startResult = manager.beginUpload(QStringLiteral("/Documents"), QStringLiteral("large.bin"), maximumChunkSize + 1);
+
+        QCOMPARE(startResult.status, FileManagerOperationStatus::Success);
+
+        const FileManagerUploadChunkResult oversizedChunkResult = manager.appendUploadChunk(0, QByteArray(maximumChunkSize + 1, 'x'));
+
+        QCOMPARE(oversizedChunkResult.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!oversizedChunkResult.errorMessage.isEmpty());
+        QVERIFY(!oversizedChunkResult.completed);
+        QVERIFY(oversizedChunkResult.path.isEmpty());
+        QVERIFY(!QFileInfo::exists(finalNativePath));
+
+        const FileManagerBrowseResult browseResult = manager.browse(QStringLiteral("/Documents"));
+        QCOMPARE(browseResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(browseResult.entries.isEmpty());
+
+        const FileManagerUploadStartResult restartResult = manager.beginUpload(QStringLiteral("/Documents"), QStringLiteral("large.bin"), maximumChunkSize + 1);
+        QCOMPARE(restartResult.status, FileManagerOperationStatus::Success);
+
+        const QByteArray firstChunk(maximumChunkSize, 'a');
+        const QByteArray finalChunk(1, 'b');
+        const FileManagerUploadChunkResult firstChunkResult = manager.appendUploadChunk(0, firstChunk);
+
+        QCOMPARE(firstChunkResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(!firstChunkResult.completed);
+
+        const FileManagerUploadChunkResult completedResult = manager.appendUploadChunk(static_cast<quint64>(firstChunk.size()), finalChunk);
+
+        QCOMPARE(completedResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(completedResult.completed);
+        QCOMPARE(completedResult.path, QStringLiteral("/Documents/large.bin"));
+
+        QFile finalFile(finalNativePath);
+        QVERIFY(finalFile.open(QIODevice::ReadOnly));
+        QCOMPARE(finalFile.readAll(), firstChunk + finalChunk);
+    }
+
+    void beginUpload_existingFileOrDirectory_failsWithoutOverwriting_data()
+    {
+        QTest::addColumn<bool>("targetIsDirectory");
+
+        QTest::newRow("existing-file") << false;
+        QTest::newRow("existing-directory") << true;
+    }
+
+    void beginUpload_existingFileOrDirectory_failsWithoutOverwriting()
+    {
+        using namespace MiniCloud::Server;
+
+        QFETCH(bool, targetIsDirectory);
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QDir documentsDirectory(QDir(storageRoot).filePath(QStringLiteral("Documents")));
+        const QString existingEntryPath = documentsDirectory.filePath(QStringLiteral("report.bin"));
+
+        if (targetIsDirectory)
+        {
+            QVERIFY(documentsDirectory.mkdir(QStringLiteral("report.bin")));
+        }
+        else
+        {
+            QFile existingFile(existingEntryPath);
+            QVERIFY(existingFile.open(QIODevice::WriteOnly));
+            QCOMPARE(existingFile.write("old-data"), qint64{8});
+            existingFile.close();
+        }
+
+        FileManager manager(storageRoot);
+
+        const FileManagerUploadStartResult collisionResult = manager.beginUpload(QStringLiteral("/Documents"), QStringLiteral("report.bin"), 3);
+
+        QCOMPARE(collisionResult.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!collisionResult.errorMessage.isEmpty());
+        QVERIFY(!collisionResult.completed);
+        QVERIFY(collisionResult.path.isEmpty());
+
+        const QFileInfo existingEntryInfo(existingEntryPath);
+        QVERIFY(existingEntryInfo.exists());
+        QCOMPARE(existingEntryInfo.isDir(), targetIsDirectory);
+
+        if (!targetIsDirectory)
+        {
+            QFile unchangedFile(existingEntryPath);
+            QVERIFY(unchangedFile.open(QIODevice::ReadOnly));
+            QCOMPARE(unchangedFile.readAll(), QByteArrayLiteral("old-data"));
+        }
+
+        const FileManagerUploadStartResult newNameResult = manager.beginUpload(QStringLiteral("/Documents"), QStringLiteral("new-report.bin"), 3);
+
+        QCOMPARE(newNameResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(newNameResult.errorMessage.isEmpty());
+        QVERIFY(!newNameResult.completed);
+        QCOMPARE(newNameResult.path, QStringLiteral("/Documents/new-report.bin"));
+    }
+
+    void beginUpload_invalidDestinationOrFileName_failsWithoutCreatingTemporaryFile_data()
+    {
+        QTest::addColumn<QString>("destinationPath");
+        QTest::addColumn<QString>("fileName");
+
+        QTest::newRow("empty-destination") << QString() << QStringLiteral("report.bin");
+        QTest::newRow("traversal-destination") << QStringLiteral("/../outside") << QStringLiteral("report.bin");
+        QTest::newRow("missing-destination") << QStringLiteral("/Missing") << QStringLiteral("report.bin");
+        QTest::newRow("file-destination") << QStringLiteral("/Documents/target.txt") << QStringLiteral("report.bin");
+        QTest::newRow("empty-file-name") << QStringLiteral("/Documents") << QString();
+        QTest::newRow("whitespace-file-name") << QStringLiteral("/Documents") << QStringLiteral("   ");
+        QTest::newRow("dot-file-name") << QStringLiteral("/Documents") << QStringLiteral(".");
+        QTest::newRow("dotdot-file-name") << QStringLiteral("/Documents") << QStringLiteral("..");
+        QTest::newRow("slash-file-name") << QStringLiteral("/Documents") << QStringLiteral("nested/report.bin");
+        QTest::newRow("backslash-file-name") << QStringLiteral("/Documents") << QStringLiteral("nested\\report.bin");
+    }
+
+    void beginUpload_invalidDestinationOrFileName_failsWithoutCreatingTemporaryFile()
+    {
+        using namespace MiniCloud::Server;
+
+        QFETCH(QString, destinationPath);
+        QFETCH(QString, fileName);
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QDir documentsDirectory(QDir(storageRoot).filePath(QStringLiteral("Documents")));
+        const QString targetFilePath = documentsDirectory.filePath(QStringLiteral("target.txt"));
+        QFile targetFile(targetFilePath);
+        QVERIFY(targetFile.open(QIODevice::WriteOnly));
+        QCOMPARE(targetFile.write("unchanged"), qint64{9});
+        targetFile.close();
+
+        const QString finalNativePath = documentsDirectory.filePath(QStringLiteral("report.bin"));
+        FileManager manager(storageRoot);
+
+        const FileManagerUploadStartResult invalidResult = manager.beginUpload(destinationPath, fileName, 3);
+
+        QCOMPARE(invalidResult.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!invalidResult.errorMessage.isEmpty());
+        QVERIFY(!invalidResult.completed);
+        QVERIFY(invalidResult.path.isEmpty());
+        QVERIFY(!QFileInfo::exists(finalNativePath));
+
+        const FileManagerBrowseResult rootBrowseResult = manager.browse(QStringLiteral("/"));
+        QCOMPARE(rootBrowseResult.status, FileManagerOperationStatus::Success);
+        QCOMPARE(rootBrowseResult.entries.size(), 1);
+        QCOMPARE(rootBrowseResult.entries.constFirst().name, QStringLiteral("Documents"));
+
+        const FileManagerBrowseResult documentsBrowseResult = manager.browse(QStringLiteral("/Documents"));
+        QCOMPARE(documentsBrowseResult.status, FileManagerOperationStatus::Success);
+        QCOMPARE(documentsBrowseResult.entries.size(), 1);
+        QCOMPARE(documentsBrowseResult.entries.constFirst().name, QStringLiteral("target.txt"));
+        QCOMPARE(documentsBrowseResult.entries.constFirst().path, QStringLiteral("/Documents/target.txt"));
+
+        QFile unchangedTargetFile(targetFilePath);
+        QVERIFY(unchangedTargetFile.open(QIODevice::ReadOnly));
+        QCOMPARE(unchangedTargetFile.readAll(), QByteArrayLiteral("unchanged"));
+
+        const FileManagerUploadStartResult validResult = manager.beginUpload(QStringLiteral("/Documents"), QStringLiteral("report.bin"), 3);
+
+        QCOMPARE(validResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(validResult.errorMessage.isEmpty());
+        QVERIFY(!validResult.completed);
+        QCOMPARE(validResult.path, QStringLiteral("/Documents/report.bin"));
+    }
+
+    void beginUpload_whileAnotherUploadIsActive_failsWithoutDisturbingOriginalTransfer()
+    {
+        using namespace MiniCloud::Server;
+
+        QTemporaryDir temporaryDirectory;
+        QVERIFY(temporaryDirectory.isValid());
+
+        const QString storageRoot = temporaryDirectory.filePath(QStringLiteral("storage"));
+        QVERIFY(QDir().mkpath(QDir(storageRoot).filePath(QStringLiteral("Documents"))));
+
+        const QDir documentsDirectory(QDir(storageRoot).filePath(QStringLiteral("Documents")));
+        const QString firstNativePath = documentsDirectory.filePath(QStringLiteral("first.bin"));
+        const QString secondNativePath = documentsDirectory.filePath(QStringLiteral("second.bin"));
+        FileManager manager(storageRoot);
+
+        const FileManagerUploadStartResult firstStartResult = manager.beginUpload(QStringLiteral("/Documents"), QStringLiteral("first.bin"), 4);
+
+        QCOMPARE(firstStartResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(!firstStartResult.completed);
+
+        const FileManagerUploadStartResult secondStartResult = manager.beginUpload(QStringLiteral("/Documents"), QStringLiteral("second.bin"), 3);
+
+        QCOMPARE(secondStartResult.status, FileManagerOperationStatus::Failed);
+        QVERIFY(!secondStartResult.errorMessage.isEmpty());
+        QVERIFY(!secondStartResult.completed);
+        QVERIFY(secondStartResult.path.isEmpty());
+        QVERIFY(!QFileInfo::exists(secondNativePath));
+
+        const FileManagerBrowseResult browseResult = manager.browse(QStringLiteral("/Documents"));
+        QCOMPARE(browseResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(browseResult.entries.isEmpty());
+
+        const FileManagerUploadChunkResult firstCompletedResult = manager.appendUploadChunk(0, QByteArrayLiteral("data"));
+
+        QCOMPARE(firstCompletedResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(firstCompletedResult.completed);
+        QCOMPARE(firstCompletedResult.path, QStringLiteral("/Documents/first.bin"));
+
+        QFile firstFile(firstNativePath);
+        QVERIFY(firstFile.open(QIODevice::ReadOnly));
+        QCOMPARE(firstFile.readAll(), QByteArrayLiteral("data"));
+
+        const FileManagerUploadStartResult secondRetryResult = manager.beginUpload(QStringLiteral("/Documents"), QStringLiteral("second.bin"), 3);
+
+        QCOMPARE(secondRetryResult.status, FileManagerOperationStatus::Success);
+        QVERIFY(secondRetryResult.errorMessage.isEmpty());
+        QVERIFY(!secondRetryResult.completed);
+        QCOMPARE(secondRetryResult.path, QStringLiteral("/Documents/second.bin"));
+    }
 };
 
 QTEST_MAIN(FileManagerTest)
