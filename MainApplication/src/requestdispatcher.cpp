@@ -49,6 +49,46 @@ MiniCloud::Protocol::MessageType RequestDispatcher::expectedResponseTypeFor(Mini
         return MiniCloud::Protocol::MessageType::AuthenticateResponse;
     }
 
+    if (requestType == MiniCloud::Protocol::MessageType::BrowseRequest)
+    {
+        return MiniCloud::Protocol::MessageType::BrowseResponse;
+    }
+
+    if (requestType == MiniCloud::Protocol::MessageType::SearchRequest)
+    {
+        return MiniCloud::Protocol::MessageType::SearchResponse;
+    }
+
+    if (requestType == MiniCloud::Protocol::MessageType::CreateDirectoryRequest)
+    {
+        return MiniCloud::Protocol::MessageType::FileOperationResponse;
+    }
+
+    if (requestType == MiniCloud::Protocol::MessageType::RenameRequest)
+    {
+        return MiniCloud::Protocol::MessageType::FileOperationResponse;
+    }
+
+    if (requestType == MiniCloud::Protocol::MessageType::MoveRequest)
+    {
+        return MiniCloud::Protocol::MessageType::FileOperationResponse;
+    }
+
+    if (requestType == MiniCloud::Protocol::MessageType::DeleteRequest)
+    {
+        return MiniCloud::Protocol::MessageType::FileOperationResponse;
+    }
+
+    if (requestType == MiniCloud::Protocol::MessageType::UploadStartRequest)
+    {
+        return MiniCloud::Protocol::MessageType::UploadReadyResponse;
+    }
+
+    if (requestType == MiniCloud::Protocol::MessageType::DownloadRequest)
+    {
+        return MiniCloud::Protocol::MessageType::DownloadStartResponse;
+    }
+
     return MiniCloud::Protocol::MessageType::Invalid;
 }
 
@@ -130,7 +170,12 @@ void RequestDispatcher::onFrameReceived(const MiniCloud::Protocol::ProtocolFrame
         return;
     }
 
-    if (frame.header.messageType == pendingRequestIt->expectedResponseType)
+    const bool isEmptyUploadCompletion =
+        pendingRequestIt->requestType == MiniCloud::Protocol::MessageType::UploadStartRequest
+        && frame.header.messageType == MiniCloud::Protocol::MessageType::FileOperationResponse;
+
+    if (frame.header.messageType == pendingRequestIt->expectedResponseType
+        || isEmptyUploadCompletion)
     {
         const MiniCloud::Client::RequestDestination destination = pendingRequestIt->destination;
         m_pendingRequests.erase(pendingRequestIt);

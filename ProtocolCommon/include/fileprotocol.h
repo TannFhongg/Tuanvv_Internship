@@ -348,4 +348,5 @@ namespace MiniCloud::Protocol
 
 Q_DECLARE_METATYPE(MiniCloud::Protocol::FileEntryType)
 Q_DECLARE_METATYPE(MiniCloud::Protocol::FileEntryData)
+Q_DECLARE_METATYPE(QList<MiniCloud::Protocol::FileEntryData>)
 Q_DECLARE_METATYPE(MiniCloud::Protocol::BrowseResponseData)
