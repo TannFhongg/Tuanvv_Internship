@@ -8,7 +8,7 @@
 #include "requesttypes.h"
 
 ApplicationController::ApplicationController(QObject *parent)
-    : ApplicationController(5000, parent) {}
+    : ApplicationController(50000, parent) {}
 
 ApplicationController::ApplicationController(int requestTimeoutMs, QObject *parent)
     : QObject(parent), m_networkClient(), m_requestDispatcher(&m_networkClient, requestTimeoutMs)

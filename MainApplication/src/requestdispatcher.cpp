@@ -4,7 +4,7 @@
 namespace
 {
     constexpr int timeoutCheckIntervalMs = 100;
-    constexpr int defaultRequestTimeoutMs = 5000;
+    constexpr int defaultRequestTimeoutMs = 50000;
 
     bool isValidDestination(MiniCloud::Client::RequestDestination destination)
     {
