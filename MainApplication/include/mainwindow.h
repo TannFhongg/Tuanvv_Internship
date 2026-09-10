@@ -21,9 +21,14 @@ public:
     ~MainWindow() override;
 
 private:
+    void clearFileSessionUi();
     void refreshUiState();
 
     Ui::MainWindow *ui;
     ApplicationController *m_controller;
+    bool m_refreshCurrentDirectoryAfterMutation = false;
+    bool m_transferInProgress = false;
+    bool m_hadActiveFileSession = false;
+    bool m_userInitiatedDisconnect = false;
 };
 #endif // MAINWINDOW_H
