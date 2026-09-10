@@ -173,6 +173,106 @@ add_test(
     COMMAND MainWindowTest authenticateResponse_valid_opensFileFeaturesAndKeepsSessionConnected)
 
 add_test(
+    NAME MainWindowTest.authenticateResponse_valid_requestsRootBrowseAndShowsEntries
+    COMMAND MainWindowTest authenticateResponse_valid_requestsRootBrowseAndShowsEntries)
+
+add_test(
+    NAME MainWindowTest.openDirectoryEntry_requestsNestedBrowseAndShowsChildEntries
+    COMMAND MainWindowTest openDirectoryEntry_requestsNestedBrowseAndShowsChildEntries)
+
+add_test(
+    NAME MainWindowTest.upButton_fromNestedDirectory_requestsParentBrowseAndRestoresRootState
+    COMMAND MainWindowTest upButton_fromNestedDirectory_requestsParentBrowseAndRestoresRootState)
+
+add_test(
+    NAME MainWindowTest.refreshButton_requestsCurrentPathAndReplacesEntries
+    COMMAND MainWindowTest refreshButton_requestsCurrentPathAndReplacesEntries)
+
+add_test(
+    NAME MainWindowTest.searchButton_validQuery_requestsSearchAndShowsResultsWithoutChangingCurrentPath
+    COMMAND MainWindowTest searchButton_validQuery_requestsSearchAndShowsResultsWithoutChangingCurrentPath)
+
+add_test(
+    NAME MainWindowTest.searchButton_blankQuery_showsValidationErrorWithoutSendingRequest
+    COMMAND MainWindowTest searchButton_blankQuery_showsValidationErrorWithoutSendingRequest)
+
+add_test(
+    NAME MainWindowTest.createDirectory_validName_sendsRequestThenRefreshesCurrentDirectory
+    COMMAND MainWindowTest createDirectory_validName_sendsRequestThenRefreshesCurrentDirectory)
+
+add_test(
+    NAME MainWindowTest.createDirectory_blankName_showsValidationErrorWithoutSendingRequest
+    COMMAND MainWindowTest createDirectory_blankName_showsValidationErrorWithoutSendingRequest)
+
+add_test(
+    NAME MainWindowTest.renameSelectedEntry_validName_sendsRequestThenRefreshesCurrentDirectory
+    COMMAND MainWindowTest renameSelectedEntry_validName_sendsRequestThenRefreshesCurrentDirectory)
+
+add_test(
+    NAME MainWindowTest.renameSelectedEntry_blankName_showsValidationErrorWithoutSendingRequest
+    COMMAND MainWindowTest renameSelectedEntry_blankName_showsValidationErrorWithoutSendingRequest)
+
+add_test(
+    NAME MainWindowTest.moveSelectedEntry_validDestination_sendsRequestThenRefreshesCurrentDirectory
+    COMMAND MainWindowTest moveSelectedEntry_validDestination_sendsRequestThenRefreshesCurrentDirectory)
+
+add_test(
+    NAME MainWindowTest.moveSelectedEntry_blankDestination_showsValidationErrorWithoutSendingRequest
+    COMMAND MainWindowTest moveSelectedEntry_blankDestination_showsValidationErrorWithoutSendingRequest)
+
+add_test(
+    NAME MainWindowTest.deleteSelectedEntry_cancelledConfirmation_doesNotSendRequest
+    COMMAND MainWindowTest deleteSelectedEntry_cancelledConfirmation_doesNotSendRequest)
+
+add_test(
+    NAME MainWindowTest.deleteSelectedEntry_confirmed_sendsRequestThenRefreshesCurrentDirectory
+    COMMAND MainWindowTest deleteSelectedEntry_confirmed_sendsRequestThenRefreshesCurrentDirectory)
+
+add_test(
+    NAME MainWindowTest.deleteSelectedEntry_errorResponse_showsErrorAndKeepsFileUiUsable
+    COMMAND MainWindowTest deleteSelectedEntry_errorResponse_showsErrorAndKeepsFileUiUsable)
+
+add_test(
+    NAME MainWindowTest.uploadButton_validLocalFile_sendsTransferShowsProgressAndRefreshesCurrentDirectory
+    COMMAND MainWindowTest uploadButton_validLocalFile_sendsTransferShowsProgressAndRefreshesCurrentDirectory)
+
+add_test(
+    NAME MainWindowTest.uploadInProgress_disablesConflictingFileActionsAndRestoresThemAfterCompletion
+    COMMAND MainWindowTest uploadInProgress_disablesConflictingFileActionsAndRestoresThemAfterCompletion)
+
+add_test(
+    NAME MainWindowTest.uploadButton_missingLocalPath_showsValidationErrorWithoutSendingRequest
+    COMMAND MainWindowTest uploadButton_missingLocalPath_showsValidationErrorWithoutSendingRequest)
+
+add_test(
+    NAME MainWindowTest.downloadSelectedFile_validLocalTarget_receivesTransferShowsProgressWithoutRefreshingRemoteList
+    COMMAND MainWindowTest downloadSelectedFile_validLocalTarget_receivesTransferShowsProgressWithoutRefreshingRemoteList)
+
+add_test(
+    NAME MainWindowTest.downloadSelectedFile_invalidLocalTarget_showsValidationErrorWithoutSendingRequest
+    COMMAND MainWindowTest downloadSelectedFile_invalidLocalTarget_showsValidationErrorWithoutSendingRequest)
+
+add_test(
+    NAME MainWindowTest.fileActionButtons_followSelectionAndEntryType
+    COMMAND MainWindowTest fileActionButtons_followSelectionAndEntryType)
+
+add_test(
+    NAME MainWindowTest.browseError_showsErrorKeepsFilePageAndAllowsRefreshRetry
+    COMMAND MainWindowTest browseError_showsErrorKeepsFilePageAndAllowsRefreshRetry)
+
+add_test(
+    NAME MainWindowTest.disconnectButton_fromFilePage_clearsEntriesAndRestoresLockedActivationUi
+    COMMAND MainWindowTest disconnectButton_fromFilePage_clearsEntriesAndRestoresLockedActivationUi)
+
+add_test(
+    NAME MainWindowTest.serverDisconnect_fromFilePage_showsConnectionLostAndRestoresLockedActivationUi
+    COMMAND MainWindowTest serverDisconnect_fromFilePage_showsConnectionLostAndRestoresLockedActivationUi)
+
+add_test(
+    NAME MainWindowTest.reconnectAfterFilePageDisconnect_reauthenticatesBrowsesRootAndShowsFreshEntries
+    COMMAND MainWindowTest reconnectAfterFilePageDisconnect_reauthenticatesBrowsesRootAndShowsFreshEntries)
+
+add_test(
     NAME MainWindowTest.authenticateResponse_nonValidStatus_staysLockedShowsErrorAndAllowsRetry
     COMMAND MainWindowTest authenticateResponse_nonValidStatus_staysLockedShowsErrorAndAllowsRetry)
 
