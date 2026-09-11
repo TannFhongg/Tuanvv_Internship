@@ -57,6 +57,30 @@ target_link_libraries(ServerControllerTest PRIVATE
     Qt6::Network
 )
 
+add_executable(ServerApplicationRuntimeTest
+    serverapplicationruntimetest.cpp
+)
+
+target_link_libraries(ServerApplicationRuntimeTest PRIVATE
+    ServerCore
+    MainCore
+    Qt6::Test
+    Qt6::Network
+)
+
+add_executable(ServerApplicationProcessTest
+    serverapplicationprocesstest.cpp
+)
+
+add_dependencies(ServerApplicationProcessTest ServerApplication)
+
+target_link_libraries(ServerApplicationProcessTest PRIVATE
+    ServerCore
+    MainCore
+    Qt6::Test
+    Qt6::Network
+)
+
 add_executable(ServerWindowTest
     serverwindowtest.cpp
     ../src/serverwindow.cpp
@@ -339,6 +363,30 @@ add_test(
 add_test(
     NAME ServerControllerTest
     COMMAND ServerControllerTest
+)
+
+add_test(
+    NAME ServerApplicationRuntimeTest.start_withValidConfiguration_listensOnEphemeralPortAndAcceptsTcpConnection
+    COMMAND ServerApplicationRuntimeTest
+            start_withValidConfiguration_listensOnEphemeralPortAndAcceptsTcpConnection
+)
+
+add_test(
+    NAME ServerApplicationRuntimeTest.activatedClient_browseRoot_overRuntimeTcp_receivesSeededEntry
+    COMMAND ServerApplicationRuntimeTest
+            activatedClient_browseRoot_overRuntimeTcp_receivesSeededEntry
+)
+
+add_test(
+    NAME ServerApplicationRuntimeTest.activatedClient_uploadThenDownload_overRuntimeTcp_roundTripsMultiChunkContent
+    COMMAND ServerApplicationRuntimeTest
+            activatedClient_uploadThenDownload_overRuntimeTcp_roundTripsMultiChunkContent
+)
+
+add_test(
+    NAME ServerApplicationProcessTest.launch_withConfiguredDataDirectory_servesActivatedClientOverTcp
+    COMMAND ServerApplicationProcessTest
+            launch_withConfiguredDataDirectory_servesActivatedClientOverTcp
 )
 
 add_test(
