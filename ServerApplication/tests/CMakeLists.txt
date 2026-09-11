@@ -57,6 +57,30 @@ target_link_libraries(ServerControllerTest PRIVATE
     Qt6::Network
 )
 
+add_executable(ServerWindowTest
+    serverwindowtest.cpp
+    ../src/serverwindow.cpp
+
+    ../include/serverwindow.h
+    ../Forms/serverwindow.ui
+)
+
+target_include_directories(ServerWindowTest
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
+set_target_properties(ServerWindowTest PROPERTIES
+    AUTOUIC_SEARCH_PATHS
+    "${CMAKE_CURRENT_SOURCE_DIR}/../Forms"
+)
+
+target_link_libraries(ServerWindowTest PRIVATE
+    ServerCore
+    Qt6::Test
+    Qt6::Widgets
+)
+
 add_test(
     NAME LicenseManagerTest
     COMMAND LicenseManagerTest
@@ -315,6 +339,41 @@ add_test(
 add_test(
     NAME ServerControllerTest
     COMMAND ServerControllerTest
+)
+
+add_test(
+    NAME ServerWindowTest.initialState_listsLicensesAndDisablesSelectionActions
+    COMMAND ServerWindowTest initialState_listsLicensesAndDisablesSelectionActions
+)
+
+add_test(
+    NAME ServerWindowTest.createLicenseButton_addsGeneratedEnabledLicenseToListAndSelectsIt
+    COMMAND ServerWindowTest createLicenseButton_addsGeneratedEnabledLicenseToListAndSelectsIt
+)
+
+add_test(
+    NAME ServerWindowTest.enableLicenseButton_selectedDisabledLicense_enablesAndRefreshesSelection
+    COMMAND ServerWindowTest enableLicenseButton_selectedDisabledLicense_enablesAndRefreshesSelection
+)
+
+add_test(
+    NAME ServerWindowTest.disableLicenseButton_selectedEnabledLicense_disablesAndRefreshesSelection
+    COMMAND ServerWindowTest disableLicenseButton_selectedEnabledLicense_disablesAndRefreshesSelection
+)
+
+add_test(
+    NAME ServerWindowTest.refreshLicensesButton_reloadsManagerListAndPreservesSelectedKey
+    COMMAND ServerWindowTest refreshLicensesButton_reloadsManagerListAndPreservesSelectedKey
+)
+
+add_test(
+    NAME ServerWindowTest.createLicenseButton_uninitializedManager_showsErrorWithoutChangingTable
+    COMMAND ServerWindowTest createLicenseButton_uninitializedManager_showsErrorWithoutChangingTable
+)
+
+add_test(
+    NAME ServerWindowTest.adminActions_createThenDisable_persistAcrossManagerReload
+    COMMAND ServerWindowTest adminActions_createThenDisable_persistAcrossManagerReload
 )
 
 add_test(
