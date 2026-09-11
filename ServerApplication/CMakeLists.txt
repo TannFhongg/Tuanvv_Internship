@@ -23,6 +23,7 @@ add_library(ServerCore STATIC
     src/filemanager.cpp
     src/ServerRequestDispatcher.cpp
     src/servercontroller.cpp
+    src/serverapplicationruntime.cpp
 
     include/licensemanager.h
     include/TcpServer.h
@@ -32,6 +33,7 @@ add_library(ServerCore STATIC
     include/filemanager.h
     include/ServerRequestDispatcher.h
     include/servercontroller.h
+    include/serverapplicationruntime.h
 )
 target_include_directories(ServerCore
     PUBLIC

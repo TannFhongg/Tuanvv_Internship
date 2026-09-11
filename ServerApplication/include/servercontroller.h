@@ -25,7 +25,11 @@ public:
 
     void stop();
 
+    bool isListening() const;
     quint16 serverPort() const;
+    QString lastError() const;
+
+    MiniCloud::Server::LicenseManager &licenseManager() noexcept;
 
 private:
     MiniCloud::Server::LicenseManager m_licenseManager;

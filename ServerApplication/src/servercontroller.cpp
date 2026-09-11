@@ -46,7 +46,22 @@ void ServerController::stop()
     m_tcpServer.stop();
 }
 
+bool ServerController::isListening() const
+{
+    return m_tcpServer.isListening();
+}
+
 quint16 ServerController::serverPort() const
 {
     return m_tcpServer.serverPort();
+}
+
+QString ServerController::lastError() const
+{
+    return m_tcpServer.errorString();
+}
+
+MiniCloud::Server::LicenseManager &ServerController::licenseManager() noexcept
+{
+    return m_licenseManager;
 }
